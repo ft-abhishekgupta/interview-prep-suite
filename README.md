@@ -81,6 +81,13 @@ serve it with `npm run preview` or `npx serve dist` rather than double-clicking
 
 On Windows you can just double-click `start.bat` to run it in development mode.
 
+### GitHub Pages
+
+`.github/workflows/deploy-pages.yml` builds the site and publishes `dist/` on every push
+to `main`. Pages must be pointed at that workflow, not at a branch: **Settings → Pages →
+Build and deployment → Source → GitHub Actions**. Serving the repository root instead
+publishes the unbuilt `index.html`, which then 404s on `/src/main.tsx`.
+
 ## Features
 
 | Feature | How to use |
