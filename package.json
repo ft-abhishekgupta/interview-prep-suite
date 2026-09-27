@@ -1,0 +1,48 @@
+{
+  "name": "senior-interview-prep",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit",
+    "validate": "node tools/validate-content.mjs",
+    "validate:fix": "node tools/validate-content.mjs --fix",
+    "check:mermaid": "node tools/check-mermaid.mjs",
+    "stats": "node tools/stats.mjs",
+    "smoke": "node tools/smoke.mjs --sample",
+    "smoke:all": "node tools/smoke.mjs --all",
+    "smoke:routes": "node tools/check-routes.mjs",
+    "smoke:theme": "node tools/check-theme.mjs",
+    "smoke:hierarchy": "node tools/check-hierarchy.mjs",
+    "regroup": "node tools/regroup.mjs",
+    "renumber": "node tools/renumber.mjs",
+    "check": "npm run typecheck && npm run validate && npm run check:mermaid"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.1.1",
+    "@fontsource-variable/jetbrains-mono": "^5.1.2",
+    "@fontsource/lexend": "^5.1.1",
+    "highlight.js": "^11.10.0",
+    "mermaid": "^11.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.28.0",
+    "rehype-highlight": "^7.0.1",
+    "rehype-slug": "^6.0.0",
+    "remark-gfm": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "linkedom": "^0.18.13",
+    "puppeteer-core": "^24.43.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
