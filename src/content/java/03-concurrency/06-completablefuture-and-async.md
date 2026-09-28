@@ -110,8 +110,11 @@ cf.thenApply(this::risky)
 Java 9 added timeout support so a hung dependency can't stall a stage forever:
 
 ```java
-cf.orTimeout(2, TimeUnit.SECONDS)                  // fail with TimeoutException after 2s
-  .completeOnTimeout(DEFAULT, 2, TimeUnit.SECONDS); // or complete with a default instead
+CompletableFuture<String> failFast =
+    cf.orTimeout(2, TimeUnit.SECONDS);                  // fail with TimeoutException
+
+CompletableFuture<String> withDefault =
+    other.completeOnTimeout(DEFAULT, 2, TimeUnit.SECONDS); // or complete normally
 ```
 
 ## Why You Must Pass Your Own Executor

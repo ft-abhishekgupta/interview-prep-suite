@@ -5,7 +5,7 @@ difficulty: Core
 tags: [messaging, retries, resilience, service-bus]
 ---
 
-Retrying is the easy part; retrying *correctly* is what gets tested. This section covers classifying failures, spacing retries so they don't cause the outage they're meant to prevent, and knowing when to stop retrying and dead-letter a message instead.
+Retrying is the easy part; retrying *correctly* is what gets tested. The important skills are classifying failures, spacing retries so they do not cause the outage they are meant to prevent, and knowing when to stop retrying and dead-letter a message instead.
 
 ## Transient vs permanent failures
 
@@ -93,7 +93,7 @@ public class RetryBudget
 
 ## Retrying non-idempotent work
 
-If a handler's side effect isn't idempotent (charging a card, sending an email), a retry after an ambiguous failure (timeout, connection reset mid-call) risks duplicating that effect. The safe pattern is: pass an idempotency key to the downstream call so it can dedupe on its side, or check a dedup/inbox table before retrying — this is the same mechanism covered under idempotency, applied specifically at the retry boundary rather than only at redelivery.
+If a handler's side effect isn't idempotent (charging a card, sending an email), a retry after an ambiguous failure (timeout, connection reset mid-call) risks duplicating that effect. The safe pattern is: pass an idempotency key to the downstream call so it can dedupe on its side, or check a dedup/inbox table before retrying — this uses the same idempotency-key or inbox-table mechanism, applied specifically at the retry boundary rather than only at redelivery.
 
 ## Broker redelivery vs in-process retry
 

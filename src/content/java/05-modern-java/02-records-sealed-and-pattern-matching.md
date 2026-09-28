@@ -13,7 +13,7 @@ The through-line is that these three features are designed to work together: rec
 
 A `record` is a transparent carrier for immutable data. From one line, the compiler generates **private final fields**, a **canonical constructor**, **accessors named after the components** (`name()`, not `getName()`), and value-based `equals`, `hashCode` and `toString`.
 
-The word "transparent" is the key idea: a record's API is exactly its state, so there's nothing hidden to get out of sync. That's why records eliminate the most tedious and bug-prone boilerplate in Java — hand-written `equals`/`hashCode` that drift when a field is added, and `toString` that forgets a field. Because they're immutable, records are also safe to share across threads and to use as map keys without defensive copying of the record itself.
+The word "transparent" is the key idea: a record's API is exactly its state, so there's nothing hidden to get out of sync. That's why records eliminate the most tedious and bug-prone boilerplate in Java — hand-written `equals`/`hashCode` that drift when a field is added, and `toString` that forgets a field. Records are **shallowly** immutable: their component fields are final, but a mutable component like `List` can still be changed unless you defensively copy it. When the components are immutable or copied, records are safe to share across threads and to use as map keys.
 
 ```java
 record Point(int x, int y) {}
@@ -210,7 +210,7 @@ Pattern matching is not always the right answer.
 
 ## Summary
 
-Records give concise, immutable value carriers with generated equality and accessors; sealed types close a hierarchy so the compiler knows every subtype; and pattern matching consumes that closed set with type patterns, guards, `null` handling and record deconstruction. Combined, a sealed interface of records switched over exhaustively is Java's take on algebraic data types, and it replaces fragile `instanceof` ladders and boilerplate visitors with compiler-checked completeness. The judgement call an interviewer wants is knowing the limits: records aren't JPA entities, and pattern-matching `switch` is wrong for open hierarchies where polymorphic methods and extensibility still win.
+Records give concise, shallowly immutable value carriers with generated equality and accessors; sealed types close a hierarchy so the compiler knows every subtype; and pattern matching consumes that closed set with type patterns, guards, `null` handling and record deconstruction. Combined, a sealed interface of records switched over exhaustively is Java's take on algebraic data types, and it replaces fragile `instanceof` ladders and boilerplate visitors with compiler-checked completeness. The judgement call an interviewer wants is knowing the limits: records aren't JPA entities, record components may still need defensive copies, and pattern-matching `switch` is wrong for open hierarchies where polymorphic methods and extensibility still win.
 
 ## Top Interview Questions
 

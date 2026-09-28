@@ -91,7 +91,7 @@ This is the Google SRE-recommended pattern for SLO-based alerting: instead of on
 | 30 min & 6 hours | 6x | A significant sustained problem | Page immediately |
 | 6 hours & 3 days | 1x | A slow burn that will exhaust the budget by month end | Ticket, not a page |
 
-Requiring **both** a short and a long window to agree (e.g., "5 min AND 1 hour both show 14.4x burn") filters out momentary blips that resolve before they matter, while still catching genuine fast-onset incidents quickly. This is covered in depth with the underlying maths in the SLO page.
+Requiring **both** a short and a long window to agree (e.g., "5 min AND 1 hour both show 14.4x burn") filters out momentary blips that resolve before they matter, while still catching genuine fast-onset incidents quickly.
 
 ## Severity levels and routing
 

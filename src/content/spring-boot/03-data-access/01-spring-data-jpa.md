@@ -111,16 +111,21 @@ Spring Data builds repositories from marker interfaces. Each level adds capabili
 ```mermaid
 flowchart LR
   A["Repository marker"] --> B["CrudRepository"]
-  B --> C["PagingAndSortingRepository"]
-  C --> D["JpaRepository"]
+  A --> C["PagingAndSortingRepository"]
+  B --> D["JpaRepository"]
+  C --> D
 ```
 
 - `Repository` — empty marker, no methods.
 - `CrudRepository` — `save`, `findById`, `delete`, `count`.
-- `PagingAndSortingRepository` — adds `findAll(Pageable)` and `findAll(Sort)`.
-- `JpaRepository` — adds JPA extras like `flush`, `saveAllAndFlush`, `getReferenceById`, and batch deletes.
+- `PagingAndSortingRepository` — `findAll(Pageable)` and `findAll(Sort)`.
+- `JpaRepository` — combines CRUD and paging/sorting with JPA extras like `flush`, `saveAllAndFlush`, `getReferenceById`, and batch deletes.
 
-Most services extend `JpaRepository<User, Long>`.
+Most services extend `JpaRepository<User, Long>`. In Spring Data 3, paging/sorting repositories no longer extend the CRUD repositories directly; `JpaRepository` composes both families for you, which is why extending `JpaRepository` remains the common default.
+
+### save versus saveAndFlush
+
+`save(entity)` makes a new entity managed (`persist`) or merges a detached one, but SQL is normally sent later at flush/commit. `saveAndFlush(entity)` calls `save` and immediately flushes the persistence context, so the database sees the SQL before the transaction commits. It is useful when you must surface a constraint violation now, call a stored procedure that depends on the row, or read with database-side effects in the same transaction. It is **not** a faster save; overusing it breaks batching and adds round trips.
 
 ### Query methods, @Query and projections
 
@@ -219,6 +224,7 @@ For those, reach for `JdbcTemplate` or the newer `JdbcClient`, or a mapper like 
 - Make `@ManyToOne` lazy; avoid `@ManyToMany`, use a join entity.
 - Owning side holds the FK; the inverse side uses `mappedBy`.
 - Use projections to select only needed columns; use keyset paging for deep pages.
+- `save` flushes later; `saveAndFlush` forces SQL now but still commits only at transaction end.
 - `ddl-auto: validate` in production; let Flyway or Liquibase own schema.
 - For reporting and bulk work, drop to `JdbcClient` or SQL.
 
@@ -231,6 +237,7 @@ For those, reach for `JdbcTemplate` or the newer `JdbcClient`, or a mapper like 
 | `equals`/`hashCode` based on the id | Base them on a stable business key |
 | Using `@ManyToMany` for an evolving link | Model an explicit join entity |
 | Selecting whole entities for a two-field view | Use an interface or DTO projection |
+| Calling `saveAndFlush` after every save | Use `save`; flush once at commit unless you need immediate database visibility |
 | `Page` when you only need next-page info | Use `Slice` to skip the count query |
 | Deep `OFFSET` pagination | Switch to keyset pagination |
 | `ddl-auto: update` in production | Use `validate` plus Flyway migrations |

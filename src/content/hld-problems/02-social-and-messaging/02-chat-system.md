@@ -28,7 +28,7 @@ The functional shape maps directly onto a diagram worth sketching early — who 
 - Low latency delivery to online users, target under 100ms within a region.
 - No message loss — durability matters even if a server or connection drops mid-send.
 - Scale to billions of messages/day and hundreds of millions of concurrent connections.
-- Strict global ordering is not required; per-chat ordering should be best-effort and visibly consistent to users.
+- Strict global ordering is not required; per-chat ordering must follow the server-assigned sequence numbers so all devices render a conversation consistently.
 
 ### Out of scope
 
@@ -86,7 +86,7 @@ The REST setup calls and the persistent WebSocket frames end up looking like thi
 
 ![alt text](notes/HLD/Problems/Whatsapp/image-2.png)
 
-```
+```http
 // REST for setup
 POST /chats { "type": "group", "participant_ids": [...] } -> { "chatId": "c_1" }
 GET  /chats/{chatId}/messages?before={cursor}&limit=50 -> Message[]
@@ -169,7 +169,7 @@ sequenceDiagram
     Gateway-->>Client: ack(tempId=local_1, status=sent)
 ```
 
-Clients tag outgoing messages with a temporary local ID (`tempId`) so the server's ack can be matched back to the optimistically-rendered message in the UI without waiting for a round trip. Deduplication (e.g. a client retries a send after a flaky connection) is handled by having the client reuse the same `tempId`/idempotency key on retry, so the server recognizes and ignores a duplicate rather than creating a second message. Strict cross-client ordering is deliberately not enforced beyond this: the server stamps each message with the time it was received, clients render using that stamp, and a message arriving fractionally out of turn is treated as a cosmetic display detail rather than a correctness bug worth engineering around.
+Clients tag outgoing messages with a temporary local ID (`tempId`) so the server's ack can be matched back to the optimistically-rendered message in the UI without waiting for a round trip. Deduplication (e.g. a client retries a send after a flaky connection) is handled by having the client reuse the same `tempId`/idempotency key on retry, so the server recognizes and ignores a duplicate rather than creating a second message. Ordering is scoped to a chat: the server assigns the next `seq_no` when the message is durably persisted, clients render by `seq_no`, and `created_at` is display metadata rather than the ordering authority. Two concurrent sends are therefore ordered by the server's accepted sequence, not by unsynchronized client clocks.
 
 ## Deep dive: group fan-out, storage model, and presence
 

@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [messaging, scaling, kafka, autoscaling]
 ---
 
-Scaling a messaging consumer is not "add more instances and it goes faster" — beyond a hard ceiling set by partitions or sessions, extra consumers just idle, and settings like prefetch, concurrency and lock duration interact in ways that silently cause message loss if tuned in isolation.
+Scaling a messaging consumer is not "add more instances and it goes faster" — beyond a hard ceiling set by partitions or sessions, extra consumers just idle, and settings like prefetch, concurrency and lock duration interact in ways that silently cause duplicate concurrent processing if tuned in isolation.
 
 ## Competing consumers vs consumer groups
 

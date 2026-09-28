@@ -182,6 +182,14 @@ public int trap(int[] height) {
 > [!DANGER]
 > Two pointers on an **unsorted** array for a sum problem is a classic trap — the greedy "move left if sum too small" argument only holds because the array is sorted. On unsorted data, use a hash set instead, or sort first if indices don't matter.
 
+## Interview edge cases and proof habits
+
+Two-pointer code is short, so interviewers usually press on the proof and the boundary cases. For pair-sum and k-sum, say exactly what sortedness buys you: it turns one comparison into permission to discard a whole row or column of the implicit pair matrix. For container and rain-water problems, the proof is not sortedness; it is a bottleneck argument about the shorter wall or smaller running maximum. For slow/fast partitioning, the invariant is a write boundary: everything before `slow` already satisfies the keep condition, and everything from `slow` to `fast - 1` is disposable or not yet final.
+
+Also clarify output conventions before coding. Some problems want values, some want indices, some require original indices, and sorting destroys original positions unless you carry `(value, index)` pairs. Duplicates also change the code path: a "find any pair" function can return immediately, while "return all unique triplets" must sort and skip equal neighbours at every decision level. Finally, be careful with integer overflow in sum comparisons when values can approach `Integer.MAX_VALUE`; promote the sum to `long` before comparing to the target if constraints are large.
+
+For linked-list slow/fast variants, state the movement rates as part of the invariant: fast advances two steps while slow advances one, so a cycle forces them to meet modulo the cycle length. That proof is different from array two-pointers, but the same "safe movement" discipline applies.
+
 ## Cheat sheet
 
 - Opposite-ends: `left`/`right` close inward — sorted-array sums, palindromes, container/rain water.
@@ -217,7 +225,7 @@ The **opposite-ends** variant starts one pointer at index 0 and another at the l
 
 ### Q2. Why does the two-pointer approach work for finding a pair with a target sum in a sorted array?
 
-Because the array is sorted, if `nums[left] + nums[right] > target`, then pairing `right` with anything to its left (which is `<= nums[right]`) other than positions already checked would still be `>= ` the current sum only if larger, so decreasing `right` is the only way to reduce the sum — we can safely discard `right` because it cannot form a valid pair with anything currently between `left` and `right` either (all give a larger or equal sum than checked so far). Symmetrically, if the sum is too small, increasing `left` is safe because `left` paired with anything smaller than the current `right` was already the largest possible pairing for that `left`. This monotonic argument is why sortedness is required.
+Because the array is sorted, if `nums[left] + nums[right] > target`, then pairing the same `right` with any index between `left` and `right` only makes the left value larger or equal, so every such pair is still too large; discarding `right` is safe. Symmetrically, if the sum is too small, `nums[left]` paired with the current `right` is already the largest possible sum using that `left`, so every smaller `right` would also be too small; discarding `left` is safe. This monotonic argument is why sortedness is required.
 
 ### Q3. How do you avoid duplicate triplets in the classic "Three Sum" problem?
 

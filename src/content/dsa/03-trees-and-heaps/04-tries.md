@@ -27,6 +27,7 @@ The diagram above encodes `"cat"`, `"car"`, and `"cod"` — nodes marked `*` are
 class TrieNode {
     Map<Character, TrieNode> children = new HashMap<>();
     boolean isWord;
+    String word;   // optional terminal payload for word-search/autocomplete variants
 }
 ```
 
@@ -119,11 +120,11 @@ private void collect(TrieNode node, StringBuilder path, List<String> results) {
 }
 ```
 
-Total cost is `O(L + n)` where `n` is the number of matching completions collected — you only ever visit nodes that are actual completions, never the whole trie.
+Total cost is `O(L + T)`, where `T` is the number of trie nodes in the matching prefix's subtree (equivalently proportional to the total characters in the completions returned). You never touch unrelated branches outside that prefix.
 
 ## Word search on a board
 
-Combine a trie with DFS/backtracking on a 2-D grid to search for **multiple words simultaneously**, instead of running a separate DFS per word. Insert all target words into a trie first; then DFS from every board cell, following trie edges instead of a fixed target string, and prune immediately when the current path leaves the trie.
+Combine a trie with DFS/backtracking on a 2-D grid to search for **multiple words simultaneously**, instead of running a separate DFS per word. Insert all target words into a trie first (storing the complete word on each terminal node); then DFS from every board cell, following trie edges instead of a fixed target string, and prune immediately when the current path leaves the trie.
 
 ```java
 void dfs(char[][] board, int r, int c, TrieNode node, List<String> found) {
@@ -131,15 +132,14 @@ void dfs(char[][] board, int r, int c, TrieNode node, List<String> found) {
     if (ch == '#') return;
     TrieNode next = node.children.get(ch);
     if (next == null) return;
-    node = next;
-    if (node.isWord) { found.add(/* reconstructed word */ ""); node.isWord = false; }  // avoid duplicates
+    if (next.word != null) { found.add(next.word); next.word = null; }  // avoid duplicates
 
     board[r][c] = '#';   // mark visited
     int[][] dirs = { {0, 1}, {0, -1}, {1, 0}, {-1, 0} };
     for (int[] d : dirs) {
         int nr = r + d[0], nc = c + d[1];
         if (nr >= 0 && nr < board.length && nc >= 0 && nc < board[0].length)
-            dfs(board, nr, nc, node, found);
+            dfs(board, nr, nc, next, found);
     }
     board[r][c] = ch;    // backtrack
 }
@@ -155,13 +155,14 @@ Insert all strings, then walk down from the root as long as each node has exactl
 // Simpler non-trie approach for a single call: compare strings pairwise
 public String longestCommonPrefix(String[] strs) {
     if (strs.length == 0) return "";
-    String prefix = strs[0];
+    int end = strs[0].length();
     for (int i = 1; i < strs.length; i++) {
-        while (!strs[i].startsWith(prefix))
-            prefix = prefix.substring(0, prefix.length() - 1);   // shrink from the end
-        if (prefix.isEmpty()) return "";
+        int j = 0;
+        while (j < end && j < strs[i].length() && strs[0].charAt(j) == strs[i].charAt(j)) j++;
+        end = j;
+        if (end == 0) return "";
     }
-    return prefix;
+    return strs[0].substring(0, end);
 }
 ```
 
@@ -197,7 +198,7 @@ KMP's insight is that a mismatch still tells you something: the characters match
 
 This "longest proper prefix that's also a suffix" is precomputed once per pattern into an **LPS array**:
 
-```
+```text
 pattern = "ABABC"
 lps[0] = 0   (A            — no proper prefix)
 lps[1] = 0   (AB           — no prefix equals a suffix)
@@ -222,6 +223,7 @@ int[] buildLps(String pattern) {
 
 // O(n + m) — the text pointer i never moves backward; only the pattern pointer j falls back
 List<Integer> kmpSearch(String text, String pattern) {
+    if (pattern.isEmpty()) return List.of(0);
     int[] lps = buildLps(pattern);
     List<Integer> matches = new ArrayList<>();
     int i = 0, j = 0;
@@ -274,7 +276,7 @@ The hash-match check must still verify the actual substring (`O(m)`) because dif
 
 ### Z-algorithm
 
-`Z[i]` is the length of the longest substring starting at index `i` that is also a prefix of the whole string. Once you have the Z-array, pattern search becomes a single concatenation trick: build `pattern + '$' + text` (`$` being a separator absent from both), compute its Z-array, and every index where `Z[i] == pattern.Length` marks a match in `text`.
+`Z[i]` is the length of the longest substring starting at index `i` that is also a prefix of the whole string. Once you have the Z-array, pattern search becomes a single concatenation trick: build `pattern + '$' + text` (`$` being a separator absent from both), compute its Z-array, and every index where `Z[i] == pattern.length()` marks a match in `text`.
 
 ```java
 // O(n) — maintains [l, r), the rightmost prefix-matching window found so far, to avoid re-comparing known characters
@@ -291,7 +293,7 @@ int[] zArray(String s) {
 }
 ```
 
-Beyond pattern search, the Z-array directly answers "how many distinct substrings does this string have" and "what's the shortest repeating unit of this string" — questions where KMP's LPS array is a less natural fit.
+Beyond pattern search, the Z-array helps with prefix-heavy questions such as "what's the shortest repeating unit of this string"; with additional bookkeeping it can also be used in distinct-substring counting, though suffix arrays/automata are the more common production tools for that problem.
 
 > [!NOTE]
 > **Aho-Corasick** is what you reach for when you have *many* patterns to search for simultaneously in one text: build a trie of all patterns, then add KMP-style failure links between trie nodes so a mismatch falls back to the longest matching suffix already seen, anywhere in the trie. It runs in `O(n + Σ|patterns| + matches)` — the trie you already know how to build, plus one linear pass. **Manacher's algorithm** solves a different problem — every palindromic substring in `O(n)`, by mirroring already-computed palindrome lengths around a tracked centre — worth recognising by name even if you'd rarely implement it from scratch under interview time pressure.
@@ -302,7 +304,7 @@ Beyond pattern search, the Z-array directly answers "how many distinct substring
 | KMP | `O(m)` | `O(n)` | `O(m)` | Single pattern, guaranteed no re-scanning |
 | Z-algorithm | `O(n + m)` | `O(n + m)` | `O(n + m)` | Prefix-based queries, distinct-substring counting |
 | Rabin-Karp | `O(m)` | `O(n)` average | `O(1)` | Multi-pattern search, duplicate-substring problems |
-| Aho-Corasick | `O(Σ\|pᵢ\|)` | `O(n + matches)` | `O(Σ\|pᵢ\|·α)` | Many patterns searched simultaneously |
+| Aho-Corasick | `O(Σ\|pᵢ\|)` | `O(n + matches)` | `O(Σ\|pᵢ\|)` with sparse transitions | Many patterns searched simultaneously |
 
 ## Cheat sheet
 

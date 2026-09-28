@@ -110,7 +110,7 @@ Set explicit container memory limits and configure the GC to respect them (`DOTN
 
 ## Observability hooks
 
-Production readiness assumes you can *see* the guards above working: structured logs with correlation IDs, metrics (request rate, latency percentiles, error rate, thread-pool queue length, GC pauses), and distributed traces across service boundaries. The three together — logs, metrics, traces — are what let you diagnose an incident from a dashboard instead of guessing.
+Production readiness assumes you can *see* these guards working: structured logs with correlation IDs, metrics (request rate, latency percentiles, error rate, thread-pool queue length, GC pauses), and distributed traces across service boundaries. The three together — logs, metrics, traces — are what let you diagnose an incident from a dashboard instead of guessing.
 
 ## The readiness checklist
 
@@ -167,7 +167,7 @@ flowchart TD
 
 ## Summary
 
-Production readiness is the sum of many small guards, each cheap to add and expensive to omit: pooled HTTP clients instead of ad-hoc ones, timeouts that propagate as cancellation, graceful shutdown that drains instead of dropping, concurrency limits that shed load instead of queuing it unboundedly, and enough observability to see all of the above actually working. None of these are exotic — they're the difference between a demo and a service that survives its first real incident, and interviewers use this topic specifically to separate candidates who have operated something in production from those who have only built it.
+Production readiness is the sum of many small guards, each cheap to add and expensive to omit: pooled HTTP clients instead of ad-hoc ones, timeouts that propagate as cancellation, graceful shutdown that drains instead of dropping, concurrency limits that shed load instead of queuing it unboundedly, and enough observability to see those safeguards actually working. None of these are exotic — they're the difference between a demo and a service that survives its first real incident, and interviewers use this topic specifically to separate candidates who have operated something in production from those who have only built it.
 
 ## Top Interview Questions
 

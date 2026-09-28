@@ -15,7 +15,7 @@ Bit manipulation questions are less about cleverness and more about recognising 
 | OR | `\|` | 1 where either bit is 1 — used to set bits |
 | XOR | `^` | 1 where bits differ — used to toggle bits and cancel duplicates |
 | NOT | `~` | Flips every bit | 
-| Shift | `<<`, `>>` | Moves bits left/right — equivalent to multiply/divide by powers of 2 |
+| Shift | `<<`, `>>`, `>>>` | Moves bits left/right — left shift multiplies by powers of 2 until overflow; signed right shift is arithmetic |
 
 ```mermaid
 flowchart LR
@@ -26,7 +26,7 @@ flowchart LR
 ```
 
 > [!KEY]
-> Every bit trick below is built from just three ideas: `1 << k` produces a mask with only bit `k` set, `&` reads or clears against that mask, and `|`/`^` write against it.
+> Every bit trick in this page is built from just three ideas: `1 << k` produces a mask with only bit `k` set, `&` reads or clears against that mask, and `|`/`^` write against it.
 
 ## Common idioms
 
@@ -36,7 +36,7 @@ flowchart LR
 | Set bit `k` | `x \| (1 << k)` | Idempotent — safe to call twice |
 | Clear bit `k` | `x & ~(1 << k)` | `~(1 << k)` has every bit set except `k` |
 | Toggle bit `k` | `x ^ (1 << k)` | Flips just that bit |
-| Lowest set bit (isolated) | `x & -x` | Relies on two's complement; see below |
+| Lowest set bit (isolated) | `x & -x` | Relies on two's complement; returns `0` when `x == 0` |
 | Clear lowest set bit | `x & (x - 1)` | Used to count set bits in `O(popcount)` iterations |
 | Check power of two | `x > 0 && (x & (x - 1)) == 0` | A power of two has exactly one set bit |
 | Count set bits | `Integer.bitCount(x)` | Built-in in Java; avoid hand-rolled loops when available |
@@ -133,7 +133,13 @@ When `n` is small (roughly `≤ 20`) and the state needs to track "which subset 
 // Transition: dp[mask | (1 << j)][j] = min(existing, dp[mask][i] + cost[i][j])
 ```
 
-See the dynamic programming patterns page for the full worked bitmask DP example — the key takeaway here is that bit operations (`mask | (1 << j)`, `mask & (1 << i)`) are exactly the vocabulary that bitmask DP is written in.
+The key takeaway for bitmask DP is that bit operations (`mask | (1 << j)`, `mask & (1 << i)`) are exactly the vocabulary used to add items to a state and test whether an item is already present.
+
+## Width, signedness and masks
+
+Bit tricks are constant time only after you choose the correct integer width. `1 << n` overflows or wraps the shift count for large `n`, so subset enumeration with an `int` mask is practical only while `n < 31`; most interview bitmask DP stays around `n <= 20` anyway because `2^n` states dominate the runtime. Use `1L << n` when the mask needs up to 63 bits, and switch to `BitSet` or a boolean array when the set is larger than a machine word.
+
+Signedness matters even when the operation is "just bits." Java stores `int` and `long` as signed two's-complement values, so a mask with bit 31 set prints as a negative number even though the bit pattern is valid. That is fine if you only use bitwise operations, but it becomes a bug if you compare masks numerically, right-shift with `>>` when `>>>` was intended, or serialize the value expecting an unsigned decimal string. State whether you are treating the number as a mathematical integer or as a raw bit pattern.
 
 ## Cheat sheet
 
@@ -169,7 +175,7 @@ To check bit `k`, right-shift by `k` and AND with `1`: `(x >> k) & 1`, which iso
 
 ### Q2. Why does `x & -x` isolate the lowest set bit, and what does it rely on?
 
-It relies on two's complement representation, where `-x` is computed as `~x + 1`. Flipping all bits of `x` turns every bit below the lowest set bit from `0` to `1`, and turns the lowest set bit itself from `1` to `0`. Adding `1` then causes a carry chain through all those newly-flipped `1`s, flipping them back to `0` and setting the former lowest-set-bit position back to `1` — everything above that position is inverted from the original. ANDing `x` with `-x` therefore leaves only the lowest set bit as `1` and clears everything else, in both directions. This trick is undefined for `x = 0`, which has no set bit.
+It relies on two's complement representation, where `-x` is computed as `~x + 1`. Flipping all bits of `x` turns every bit below the lowest set bit from `0` to `1`, and turns the lowest set bit itself from `1` to `0`. Adding `1` then causes a carry chain through all those newly-flipped `1`s, flipping them back to `0` and setting the former lowest-set-bit position back to `1` — everything above that position is inverted from the original. ANDing `x` with `-x` therefore leaves only the lowest set bit as `1` and clears everything else. For `x = 0`, Java still evaluates the expression as `0`; it just means there was no set bit to isolate.
 
 ### Q3. Given an array where every element appears twice except one, how do you find the unique one in O(n) time and O(1) space?
 

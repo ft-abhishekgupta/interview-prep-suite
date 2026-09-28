@@ -91,7 +91,10 @@ SELECT * FROM (
 ```sql
 -- Running total of daily revenue
 SELECT order_date, daily_total,
-       SUM(daily_total) OVER (ORDER BY order_date) AS running_total
+       SUM(daily_total) OVER (
+           ORDER BY order_date
+           ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) AS running_total
 FROM daily_revenue;
 
 -- Month-over-month growth percentage
@@ -101,7 +104,7 @@ SELECT month, revenue,
              / LAG(revenue) OVER (ORDER BY month), 2) AS pct_growth
 FROM monthly_revenue;
 ```
-A window `SUM` with no `PARTITION BY` accumulates over the whole ordered set; `LAG` reaches back one row within the same ordering to compute a delta.
+A window `SUM` with no `PARTITION BY` accumulates over the whole ordered set; the explicit `ROWS` frame avoids the default `RANGE` behaviour that groups tied dates together. `LAG` reaches back one row within the same ordering to compute a delta; guard the division if the previous value can be zero or `NULL`.
 
 ## Gaps and islands
 
@@ -116,12 +119,15 @@ WHERE NOT EXISTS (SELECT 1 FROM sequence_table WHERE id = s.id + 1)
 SELECT user_id, MIN(activity_date) AS run_start, MAX(activity_date) AS run_end
 FROM (
     SELECT user_id, activity_date,
-           DATEDIFF(day, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY activity_date), activity_date) AS grp
+           DATEADD(day,
+               -ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY activity_date),
+               activity_date
+           ) AS grp
     FROM daily_activity
 ) t
 GROUP BY user_id, grp;
 ```
-The islands trick works because subtracting a strictly-increasing row number from a consecutive date sequence produces the **same constant** for every row in one unbroken run — that constant becomes the group key.
+The islands trick works because subtracting a strictly-increasing row number (as a day interval) from a consecutive date sequence produces the **same date constant** for every row in one unbroken run — that constant becomes the group key. A gap changes the constant and starts a new island.
 
 ## Consecutive rows matching a condition
 
@@ -164,7 +170,7 @@ FROM employees e
 JOIN employees m ON e.manager_id = m.id
 WHERE e.salary > m.salary;
 ```
-A **self-join**: the same table plays two roles (employee and manager) via two aliases, joined on the foreign key that references the table's own primary key.
+A **self-join**: the same table plays two roles (employee and manager) via two aliases, joined on the foreign key that references the table's own primary key. Employees without a manager naturally drop out because the inner join finds no matching manager row; switch to a `LEFT JOIN` only if the report must include CEOs or top-level managers with `NULL` manager columns. In a live interview, name both aliases clearly (`e` and `m`) and qualify every column, because ambiguous self-joins are a common source of wrong answers and accidental Cartesian products. The pattern generalises to any row-to-row comparison inside one table.
 
 ## Department top earners and rank with ties
 
@@ -202,7 +208,11 @@ SELECT product_id, 'q2', q2 FROM sales_wide;
 ## Median and percentage of total
 
 ```sql
--- Median (engines with PERCENTILE_CONT)
+-- Median, T-SQL form
+SELECT DISTINCT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) OVER () AS median_salary
+FROM employees;
+
+-- Postgres/Oracle ordered-set aggregate form
 SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary) AS median_salary
 FROM employees;
 
@@ -226,9 +236,9 @@ WHERE o.id IS NULL;
 -- Customers active in every one of the last 12 months
 SELECT customer_id
 FROM orders
-WHERE order_date >= DATEADD(month, -12, GETDATE())
+WHERE order_date >= DATEADD(month, -11, DATEADD(month, DATEDIFF(month, 0, GETDATE()), 0))
 GROUP BY customer_id
-HAVING COUNT(DISTINCT DATEPART(month, order_date)) = 12;
+HAVING COUNT(DISTINCT DATEADD(month, DATEDIFF(month, 0, order_date), 0)) = 12;
 ```
 `LEFT JOIN ... WHERE right.id IS NULL` is the canonical "exists in A but not B" pattern — prefer it or `NOT EXISTS` over `NOT IN`, since `NOT IN` silently returns no rows if the subquery contains a single `NULL`.
 
@@ -239,7 +249,7 @@ HAVING COUNT(DISTINCT DATEPART(month, order_date)) = 12;
 | Row order within a group | `ROW_NUMBER() OVER (PARTITION BY g ORDER BY c)` |
 | Rank with tie handling | `RANK()` / `DENSE_RANK() OVER (...)` |
 | Previous/next row's value | `LAG(col, 1) OVER (...)` / `LEAD(col, 1) OVER (...)` |
-| Running/grand total | `SUM(col) OVER (ORDER BY ...)` / `SUM(col) OVER ()` |
+| Running/grand total | `SUM(col) OVER (ORDER BY ... ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` / `SUM(col) OVER ()` |
 | First/last value in a window | `FIRST_VALUE(col) OVER (...)` / `LAST_VALUE(col) OVER (...)` |
 | Percentile / median | `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY col)` |
 | Conditional aggregation | `SUM(CASE WHEN cond THEN val ELSE 0 END)` |
@@ -362,11 +372,11 @@ FROM employees e
 JOIN employees m ON e.manager_id = m.id
 WHERE e.salary > m.salary;
 ```
-This is a self-join: the same `employees` table is referenced twice with different aliases (`e` for the employee row, `m` for their manager's row), joined on the foreign key `manager_id` that points back into the same table's primary key. Any "compare a row to a related row in the same table" problem — an employee to their manager, an order to the customer's previous order — follows this same shape.
+This is a self-join: the same `employees` table is referenced twice with different aliases (`e` for the employee row, `m` for their manager's row), joined on the foreign key `manager_id` that points back into the same table's primary key. Any "compare a row to a related row in the same table" problem — an employee to their manager, an order to the customer's previous order — follows this same shape. The inner join intentionally excludes employees with no manager; switch to a `LEFT JOIN` only if the report must show top-level managers too.
 
 ### Q6. How do you compute a running total and a month-over-month growth percentage?
 
-A running total is a windowed `SUM` ordered by the column you're accumulating over, with no `PARTITION BY` if it should run across the whole result set: `SUM(daily_total) OVER (ORDER BY order_date)`. Month-over-month growth needs the *previous* row's value first, via `LAG(revenue) OVER (ORDER BY month)`, then a straightforward `(current - previous) / previous * 100` calculation. Both patterns rely on the same underlying idea — window functions let you reference other rows relative to the current one without a self-join or a correlated subquery, which is both clearer to read and typically much faster.
+A running total is a windowed `SUM` ordered by the column you're accumulating over, with no `PARTITION BY` if it should run across the whole result set: `SUM(daily_total) OVER (ORDER BY order_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`. I write the `ROWS` frame explicitly because the default with `ORDER BY` is `RANGE ... CURRENT ROW`, which can surprise you when multiple rows share the same date. Month-over-month growth needs the previous row's value first, via `LAG(revenue) OVER (ORDER BY month)`, then `(current - previous) / previous * 100`, guarded for `NULL` or zero previous revenue. Both patterns avoid a self-join by letting the current row see neighbouring rows.
 
 ### Q7. Why is `NOT IN` risky for a "customers with no orders" style query, and what should you use instead?
 
@@ -374,7 +384,7 @@ A running total is a windowed `SUM` ordered by the column you're accumulating ov
 
 ### Q8. How would you calculate the median salary in SQL, and how does that differ across database engines?
 
-In engines that support it (Postgres, SQL Server, Oracle), `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary)` computes the median directly, interpolating between the two middle values for an even-count dataset. In engines without native percentile support, the manual equivalent counts rows and picks the middle one(s) by ordering: assign `ROW_NUMBER()` twice (ascending and descending), and select the row(s) where the two numbers are equal or adjacent, averaging if there are two middle rows. I'd always check the target engine first — this is one of the areas where SQL dialects diverge the most, and I'd say so explicitly rather than assume a syntax that might not exist.
+In engines that support it, `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY salary)` computes the median directly, interpolating between the two middle values for an even-count dataset. The exact syntax varies: SQL Server uses it as a window function with `OVER ()` (often with `SELECT DISTINCT` to return one row), while Postgres and Oracle support the ordered-set aggregate form. In engines without native percentile support, the manual equivalent counts rows and picks the middle one(s) by ordering: assign row numbers, select the middle one or two rows, and average when there are two. I'd always state the target engine first because median syntax is one of the least portable interview snippets.
 
 ### Q9. How would you find and safely delete duplicate rows, keeping only one copy of each?
 

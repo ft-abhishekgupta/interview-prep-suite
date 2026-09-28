@@ -58,22 +58,25 @@ Dijkstra maintains a min-heap of `(distance, node)` and repeatedly finalises the
 
 ```java
 // O((V + E) log V) time, O(V + E) space
-int[] dist = new int[n];
-Arrays.fill(dist, Integer.MAX_VALUE);
+long INF = Long.MAX_VALUE / 4;
+long[] dist = new long[n];
+Arrays.fill(dist, INF);
 dist[src] = 0;
 // Java's PriorityQueue has no decrease-key, so we push a fresh {node, distance}
 // pair on every relaxation and skip stale pairs when they surface (lazy deletion)
-PriorityQueue<int[]> pq = new PriorityQueue<>(Comparator.comparingInt(a -> a[1]));
-pq.offer(new int[]{src, 0});
+record State(int node, long dist) {}
+PriorityQueue<State> pq = new PriorityQueue<>(Comparator.comparingLong(State::dist));
+pq.offer(new State(src, 0));
 while (!pq.isEmpty()) {
-    int[] top = pq.poll();
-    int u = top[0], d = top[1];
+    State top = pq.poll();
+    int u = top.node();
+    long d = top.dist();
     if (d > dist[u]) continue;          // stale entry, skip
     for (int[] edge : adj.get(u)) {
         int v = edge[0], w = edge[1];
         if (dist[u] + w < dist[v]) {
             dist[v] = dist[u] + w;
-            pq.offer(new int[]{v, dist[v]});
+            pq.offer(new State(v, dist[v]));
         }
     }
 }
@@ -90,25 +93,26 @@ Bellman-Ford relaxes **every edge**, `V - 1` times. After `V - 1` rounds, all sh
 
 ```java
 // O(V * E) time, O(V) space
-int[] dist = new int[n];
-Arrays.fill(dist, Integer.MAX_VALUE);
+long INF = Long.MAX_VALUE / 4;
+long[] dist = new long[n];
+Arrays.fill(dist, INF);
 dist[src] = 0;
 for (int i = 0; i < n - 1; i++)
     for (int[] e : edges) {
         int u = e[0], v = e[1], w = e[2];
-        if (dist[u] != Integer.MAX_VALUE && dist[u] + w < dist[v])
+        if (dist[u] != INF && dist[u] + w < dist[v])
             dist[v] = dist[u] + w;
     }
 
 for (int[] e : edges) {                    // one extra pass
     int u = e[0], v = e[1], w = e[2];
-    if (dist[u] != Integer.MAX_VALUE && dist[u] + w < dist[v])
+    if (dist[u] != INF && dist[u] + w < dist[v])
         throw new IllegalStateException("Negative cycle");
 }
 ```
 
 > [!TIP]
-> Say this in the room: *"Bellman-Ford is slower — O(V·E) instead of O((V+E) log V) — but it is the only one of these that can prove there is no negative cycle."* Naming the trade-off, not just the algorithm, is what separates a memorised answer from an understood one.
+> Say this in the room: *"Bellman-Ford is slower — O(V·E) instead of O((V+E) log V) — but it is the single-source algorithm here that handles negative edges and detects reachable negative cycles."* Naming the trade-off, not just the algorithm, is what separates a memorised answer from an understood one.
 
 ## Floyd-Warshall: all pairs at once
 
@@ -125,6 +129,35 @@ for (int k = 0; k < n; k++)
 ```
 
 A negative cycle shows up as `dist[i][i] < 0` for some `i` after the loops finish. Swapping `min`/`+` for `OR`/`AND` turns the same triple loop into **transitive closure** (reachability).
+
+## 0-1 BFS and bucketed weights
+
+When edge weights are only 0 or 1, a normal queue is no longer enough because a zero-cost edge should be explored before older one-cost work. A deque fixes that: relaxing a 0-weight edge pushes the neighbour to the **front**, and relaxing a 1-weight edge pushes it to the **back**. This preserves nondecreasing distance order without a binary heap, so the runtime is `O(V + E)`.
+
+```java
+int[] dist = new int[n];
+Arrays.fill(dist, Integer.MAX_VALUE);
+Deque<Integer> dq = new ArrayDeque<>();
+dq.offer(src);
+dist[src] = 0;
+while (!dq.isEmpty()) {
+    int u = dq.pollFirst();
+    for (int[] edge : adj.get(u)) {
+        int v = edge[0], w = edge[1];      // w is 0 or 1
+        if (dist[u] + w < dist[v]) {
+            dist[v] = dist[u] + w;
+            if (w == 0) dq.offerFirst(v);
+            else dq.offerLast(v);
+        }
+    }
+}
+```
+
+For small integer weights larger than 1, use buckets (Dial's algorithm) rather than expanding each edge into dummy nodes. Both are specialised alternatives to Dijkstra that exploit tighter weight constraints.
+
+Do not use a plain `visited` boolean in weighted shortest-path code the way you would in BFS. In Dijkstra, a node becomes final only when the smallest-distance heap entry is popped; in Bellman-Ford, a node can improve across multiple rounds; in 0-1 BFS, the deque order preserves distance but the `dist[]` comparison is still the correctness guard. The invariant is "only relax from the best distance known so far", not "first discovery wins" unless every edge has identical cost.
+
+That is why the weight constraints should be read before coding: they decide not just the data structure, but also when a distance is safe to finalize.
 
 ## A*: Dijkstra with a heuristic
 
@@ -169,7 +202,7 @@ Collections.reverse(path);
 
 - **Unweighted → BFS.** No priority queue needed.
 - **Non-negative weights, single source → Dijkstra**, O((V+E) log V) with a binary heap.
-- **Negative weights → Bellman-Ford.** O(V·E), and it's the only one that certifies "no negative cycle".
+- **Negative weights, single source → Bellman-Ford.** O(V·E), and it detects reachable negative cycles. Floyd-Warshall can also detect negative cycles in the all-pairs setting.
 - **All pairs, small V (≲500) → Floyd-Warshall**, O(V³), trivial to code correctly.
 - **Have a good heuristic and a single goal → A*** narrows the search versus Dijkstra.
 - **Negative cycle means "shortest path" is undefined** — some path can be made arbitrarily small by looping.
@@ -223,7 +256,7 @@ First, confirm the priority queue holds `(distance, node)` pairs and not the who
 
 ### Q8. Can you use BFS on a weighted graph if all weights are small positive integers?
 
-Yes, with a trick: replace each edge of weight `w` with `w` unit-weight edges via dummy intermediate nodes, then run plain BFS — this is correct because BFS still explores strictly in order of total distance. It is only practical when weights are small, since it inflates the graph size by a factor of the maximum weight. A more scalable variant for a *bounded* small weight range is **0-1 BFS** using a deque: push zero-weight edges to the front and weight-1 edges to the back, which achieves O(V + E) instead of paying the log factor from a heap.
+Yes, with a trick: replace each edge of weight `w` with `w` unit-weight edges via dummy intermediate nodes, then run plain BFS — this is correct because BFS still explores strictly in order of total distance. It is only practical when weights are small, since it inflates the graph size by a factor of the maximum weight. If weights are only `0` or `1`, use **0-1 BFS** with a deque: push zero-weight edges to the front and weight-1 edges to the back, achieving `O(V + E)`. For small bounded non-negative integer weights beyond 1, use bucketed Dijkstra/Dial's algorithm rather than a plain FIFO queue.
 
 ### Q9. Two nodes are connected by multiple edges of different weights — does any of these algorithms break?
 

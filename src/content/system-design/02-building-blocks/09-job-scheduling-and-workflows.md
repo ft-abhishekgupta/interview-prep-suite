@@ -91,6 +91,10 @@ The key idea candidates often miss: the workflow **code looks like a normal sequ
 > [!WARNING]
 > Workflow code inside a durable execution framework must be **deterministic** — no direct calls to `Instant.now()`, no raw random numbers, no direct HTTP calls inside the workflow function itself. Side effects belong in separate "activities" that the framework calls and records the result of; the workflow function only orchestrates them.
 
+Deployed, that splits into three tiers: your API server, the framework's own cluster holding the event history, and pools of workers. Workflow workers run the orchestration code; activity workers perform the side effects against external services.
+
+![Durable execution topology with an API server, a workflow cluster holding a history database, and separate workflow and activity worker pools calling external services](notes/05-HighLevelDesign/DistributedSystems/image-2.png)
+
 ## Retries and idempotent jobs
 
 Every job in an at-least-once system will, eventually, run more than once — a retry after a timeout, a redelivery after a crash, a leader failover replaying an ambiguous trigger. The job itself must tolerate this:

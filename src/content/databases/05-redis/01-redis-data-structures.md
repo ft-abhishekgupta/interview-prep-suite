@@ -29,6 +29,10 @@ flowchart TD
 
 ## The core data types
 
+Redis is a flat keyspace: every key is a binary-safe string, and each key points at a **typed** value. The type is a property of the value, not the key, so `LPUSH` against a key holding a string fails with `WRONGTYPE` rather than coercing.
+
+![Redis keyspace with keys pointing at differently typed values including a string, a list and a hash](notes/03-Databases/Redis/image.png)
+
 | Type | Key commands | Complexity | Realistic use case |
 |---|---|---|---|
 | String | `SET`, `GET`, `INCR`, `EXPIRE` | O(1) | Counters, cached blobs, feature flags |
@@ -45,7 +49,7 @@ flowchart TD
 
 A sorted set keeps members ordered by a floating-point **score**, with O(log n) insert and O(log n + m) range reads — exactly the shape of a leaderboard.
 
-```
+```text
 ZADD leaderboard 1500 "alice"
 ZADD leaderboard 2200 "bob"
 ZINCRBY leaderboard 50 "alice"        # alice's score is now 1550
@@ -60,7 +64,7 @@ ZRANK leaderboard "alice"             # alice's 0-based rank, ascending
 
 A fixed-window rate limiter is a single `INCR` plus an `EXPIRE`, made race-free with `SET ... NX ... EX` or a small Lua script:
 
-```
+```text
 SET rate:user:42 0 EX 60 NX     # only sets if the key doesn't exist yet — starts the window
 INCR rate:user:42               # atomic increment
 GET rate:user:42                # compare against the limit in application code
@@ -72,7 +76,7 @@ For smoother limiting, a sorted set holding one entry per request timestamp impl
 
 A hash stores an object's fields under one key without needing one Redis key per field:
 
-```
+```text
 HSET session:abc123 userId 42 role "admin" lastSeen 1718000000
 HGET session:abc123 role
 HINCRBY session:abc123 requestCount 1

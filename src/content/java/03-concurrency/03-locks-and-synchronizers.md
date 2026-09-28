@@ -39,7 +39,7 @@ void update() { synchronized (lock) { /* ... */ } }
 
 ## The Modern JVM Lock Story
 
-Be ready to describe how intrinsic locks actually behave. Under low contention the JVM uses a **thin lock** — a cheap CAS on the object header. When threads contend, the lock **inflates** into a heavyweight OS monitor. The JVM also uses **adaptive spinning**: a thread briefly spins hoping the holder releases quickly, avoiding an expensive OS park for short critical sections. **Biased locking**, an old optimization for uncontended locks by a single thread, was **disabled by default and removed in JDK 15+** because it hurt more than it helped on modern workloads. The honest senior answer: intrinsic locks are cheap when uncontended and JIT-optimized, so `synchronized` is a fine default until profiling shows contention.
+Be ready to describe how intrinsic locks actually behave. Under low contention the JVM uses a **thin lock** — a cheap CAS on the object header. When threads contend, the lock **inflates** into a heavyweight OS monitor. The JVM also uses **adaptive spinning**: a thread briefly spins hoping the holder releases quickly, avoiding an expensive OS park for short critical sections. **Biased locking**, an old optimization for uncontended locks by a single thread, was **disabled and deprecated in JDK 15, then removed in later JDKs** because it hurt more than it helped on modern workloads. The honest senior answer: intrinsic locks are cheap when uncontended and JIT-optimized, so `synchronized` is a fine default until profiling shows contention.
 
 ## ReentrantLock — What It Buys
 
@@ -180,7 +180,7 @@ synchronized (first) { synchronized (second) { /* safe: no cycle possible */ } }
 
 ## Lock Granularity and Contention
 
-Lock **contention** is a scalability wall: if every request serializes on one lock, adding cores does nothing. The levers are **granularity** — a coarse lock is simple but serializes everything; **lock striping** splits state into segments each with its own lock (as `ConcurrentHashMap` does); and shrinking the **critical section** so the lock is held for the minimum time (never do I/O under a lock). The trade-off: finer locking scales better but risks more deadlocks and complexity.
+Lock **contention** is a scalability wall: if every request serializes on one lock, adding cores does nothing. The levers are **granularity** — a coarse lock is simple but serializes everything; **lock striping** splits custom state into independently locked stripes; and shrinking the **critical section** so the lock is held for the minimum time (never do I/O under a lock). Modern `ConcurrentHashMap` does not use the old segment striping design; since Java 8 it uses CAS plus bin-level locking. The trade-off: finer locking scales better but risks more deadlocks and complexity.
 
 ## Cheat sheet
 
@@ -252,7 +252,7 @@ If a service hangs with CPU near zero, I take a thread dump with `jstack <pid>` 
 
 ### Q10. How does lock contention limit scalability, and what can you do about it?
 
-If every operation must acquire the same lock, the lock serializes all threads and the program's throughput is capped no matter how many cores you add — this is Amdahl's law in action, where the locked section is the serial fraction. The remedies all reduce the time or breadth of serialization: shrink the **critical section** so the lock is held for the minimum work and never wraps I/O or blocking calls; use **lock striping** to split the protected state into independently locked segments so unrelated keys don't contend (how `ConcurrentHashMap` scales writes); switch to **read-write** or **optimistic** locks when reads dominate; or move to **lock-free** structures backed by CAS. The trade-off is that finer-grained locking scales better but adds complexity and more opportunities for deadlock, so you refine granularity only where profiling shows real contention.
+If every operation must acquire the same lock, the lock serializes all threads and the program's throughput is capped no matter how many cores you add — this is Amdahl's law in action, where the locked section is the serial fraction. The remedies all reduce the time or breadth of serialization: shrink the **critical section** so the lock is held for the minimum work and never wraps I/O or blocking calls; use **lock striping** in your own structures so unrelated keys don't contend; rely on modern concurrent collections that use CAS and bin-level locking; switch to **read-write** or **optimistic** locks when reads dominate; or move to **lock-free** structures backed by CAS. The trade-off is that finer-grained locking scales better but adds complexity and more opportunities for deadlock, so you refine granularity only where profiling shows real contention.
 
 ### Q11. Why must you release an explicit lock in a finally block, and what happens if you don't?
 

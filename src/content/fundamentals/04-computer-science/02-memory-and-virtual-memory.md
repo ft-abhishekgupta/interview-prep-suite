@@ -32,7 +32,7 @@ flowchart LR
 ```
 
 > [!WARNING]
-> Frequent context switches between processes can flush or partially invalidate TLB entries, which is one reason process-level context switches cost more than thread-level ones — see the processes/threads page for the full comparison.
+> Frequent context switches between processes can flush or partially invalidate TLB entries, which is one reason process-level context switches cost more than thread-level ones.
 
 ## Page faults: minor vs major
 
@@ -67,7 +67,7 @@ Every level trades capacity for latency. Concrete numbers make this real in an i
 | Network round trip (same region) | ~0.5-2 ms | — |
 
 > [!TIP]
-> Say the shape of these numbers, not the exact figures: each level is roughly **10-100x** slower than the one above it. RAM vs SSD is already a ~1000x gap; RAM vs a network call is a ~10,000-20,000x gap. This is why "just cache it in memory" beats "just add an index" for the hottest paths.
+> Say the shape of these numbers, not the exact figures: each level is roughly **10-100x** slower than the one above it. RAM vs SSD is already a ~1000x gap; RAM vs a network call is a ~10,000-20,000x gap. This is why locality and avoiding unnecessary remote or disk round trips matter so much on the hottest paths.
 
 ## Cache lines and locality of reference
 

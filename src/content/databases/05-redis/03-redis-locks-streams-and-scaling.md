@@ -11,7 +11,7 @@ Beyond caching, Redis is often reached for as a distributed lock, a lightweight 
 
 A basic distributed lock is a single atomic command:
 
-```
+```text
 SET lock:order:9001 "client-a-token-123" NX PX 30000
 ```
 
@@ -59,7 +59,7 @@ sequenceDiagram
 
 A stream is an append-only log of entries, each with an auto-generated ID, that supports **consumer groups** — multiple independent workers sharing the work, each entry delivered to exactly one consumer per group.
 
-```
+```text
 XADD orders * orderId 9001 status "placed"
 XREADGROUP GROUP workers consumer-1 COUNT 10 STREAMS orders >
 XACK orders workers 1718000000000-0
@@ -90,7 +90,7 @@ XCLAIM orders workers consumer-2 60000 1718000000000-0  # reassign a stuck entry
 | Data loss window | Up to the interval between snapshots (minutes) | As low as 1 second (`everysec`) or none (`always`, at a latency cost) |
 | Restart speed | Fast (load one snapshot) | Slower (replay the log, though rewriting compacts it) |
 | File size | Compact | Larger, grows until rewritten/compacted |
-| Typical choice | Acceptable for pure caches | Preferred when Redis holds data you can't easily lose (locks, streams, queues) |
+| Typical choice | Acceptable for pure caches | Preferred when Redis holds state you can't easily rebuild (streams, queues, durable-ish coordination metadata) |
 
 Many production deployments enable both: AOF for durability, with periodic RDB snapshots for fast full restores.
 

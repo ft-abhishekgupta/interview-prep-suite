@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [gitops, kubernetes, platform-engineering, argocd]
 ---
 
-GitOps takes the idea of "infrastructure as code" one step further: instead of a pipeline pushing changes *to* your cluster, an agent inside the cluster continuously pulls the desired state *from* Git and reconciles reality to match it. This page covers the principles, the push-vs-pull trade-off, repository structure, secrets, and the platform-engineering practices that build on top of GitOps — plus the honest case for when it's more process than a team actually needs.
+GitOps takes the idea of "infrastructure as code" one step further: instead of a pipeline pushing changes *to* your cluster, an agent inside the cluster continuously pulls the desired state *from* Git and reconciles reality to match it. The important pieces are the principles, the push-vs-pull trade-off, repository structure, secrets, and the platform-engineering practices that build on top of GitOps — plus the honest case for when it is more process than a team actually needs.
 
 ## The four GitOps principles
 
@@ -63,7 +63,7 @@ CI in the app repo builds and pushes an immutable artefact, then writes the new 
 
 Promotion is a Git operation, not a pipeline re-run: to promote a build from staging to production, you change the image tag or config in the production overlay of the config repo — typically a pull request that copies the already-tested tag from the staging path — and the GitOps controller for the production cluster picks it up. This makes environment promotion auditable (a diffable PR) and enforces "the same artefact that passed staging is what production gets," directly reinforcing the build-once-promote-everywhere principle.
 
-```
+```text
 config-repo/
   apps/checkout/
     base/

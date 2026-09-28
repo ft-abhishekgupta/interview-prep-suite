@@ -22,7 +22,7 @@ flowchart LR
 
 ## Segment trees
 
-A segment tree is a binary tree laid over array intervals, where each node stores an aggregate (sum, min, max, gcd — anything associative) of the range it covers. Both query and update walk a single root-to-leaf path plus a bounded number of siblings, giving `O(log n)` for each, at the cost of `O(4n)` space for the array-backed implementation below.
+A segment tree is a binary tree laid over array intervals, where each node stores an aggregate (sum, min, max, gcd — anything associative) of the range it covers. Both query and update walk a single root-to-leaf path plus a bounded number of siblings, giving `O(log n)` for each, at the cost of `O(4n)` space for the array-backed implementation shown here.
 
 ```java
 class SegmentTree {
@@ -37,7 +37,7 @@ class SegmentTree {
 
     private void build(int[] arr, int node, int start, int end) {
         if (start == end) { tree[node] = arr[start]; return; }
-        int mid = (start + end) / 2;
+        int mid = start + (end - start) / 2;
         build(arr, 2 * node + 1, start, mid);
         build(arr, 2 * node + 2, mid + 1, end);
         tree[node] = tree[2 * node + 1] + tree[2 * node + 2]; // sum; swap for min/max/gcd
@@ -48,7 +48,7 @@ class SegmentTree {
     private int query(int node, int start, int end, int l, int r) {
         if (r < start || end < l) return 0;               // out of range
         if (l <= start && end <= r) return tree[node];     // fully covered
-        int mid = (start + end) / 2;
+        int mid = start + (end - start) / 2;
         return query(2 * node + 1, start, mid, l, r)
              + query(2 * node + 2, mid + 1, end, l, r);
     }
@@ -57,7 +57,7 @@ class SegmentTree {
     void update(int idx, int val) { update(0, 0, n - 1, idx, val); }
     private void update(int node, int start, int end, int idx, int val) {
         if (start == end) { tree[node] = val; return; }
-        int mid = (start + end) / 2;
+        int mid = start + (end - start) / 2;
         if (idx <= mid) update(2 * node + 1, start, mid, idx, val);
         else update(2 * node + 2, mid + 1, end, idx, val);
         tree[node] = tree[2 * node + 1] + tree[2 * node + 2];
@@ -170,7 +170,7 @@ A `d × w` integer array plus `d` independent hash functions. Insert increments 
 
 ### HyperLogLog
 
-Estimates the number of *distinct* elements using roughly 1.5 KB regardless of how large the underlying stream is, by tracking the position of the leftmost zero bit across many hashed registers and averaging out the noise.
+Estimates the number of *distinct* elements using a small fixed register array regardless of how large the underlying stream is, by tracking the longest leading-zero run (equivalently, the position of the first `1` bit) across many hashed registers and averaging out the noise.
 
 - Error rate ≈ `1.04/√m` where `m` is the number of registers; `m = 16384` gives about 0.8% error.
 - Space: `m` registers at 5-6 bits each, roughly 12 KB for 0.8% error at any scale.
@@ -204,6 +204,38 @@ A system-design-flavored comparison that occasionally surfaces inside a coding r
 | Space amplification | Low | Higher until old data is compacted away |
 | Best for | Read-heavy workloads (InnoDB, Postgres) | Write-heavy workloads (Cassandra, RocksDB, LevelDB) |
 | Crash recovery | WAL + page-level recovery | WAL + compaction replay |
+
+## String algorithms and number theory
+
+Two families sit just outside the core patterns but appear often enough at senior level that not recognising the name is a visible gap. You are rarely asked to derive them; you are asked to name the right one and state its complexity.
+
+| Algorithm | Solves | Complexity | The cue in the problem |
+|---|---|---|---|
+| KMP | Substring search without backtracking the text | `O(n + m)` | "find pattern in text", repeated prefixes matter |
+| Z-algorithm | Longest match of each suffix against the whole string | `O(n)` | Prefix-matching or period-finding questions |
+| Rabin-Karp | Substring search by rolling hash | `O(n + m)` average | Many patterns at once, or compare substrings in `O(1)` |
+| Manacher | All palindromic substrings | `O(n)` | "longest palindromic substring" with `n` up to a million |
+| Sieve of Eratosthenes | All primes up to `n` | `O(n log log n)` | Repeated primality queries over a bounded range |
+| Shunting-yard | Infix expression to postfix, then evaluate | `O(n)` | "evaluate this expression string" with precedence and brackets |
+| Digit DP | Count numbers in a range with a digit property | `O(digits x states)` | "how many numbers between A and B such that..." |
+
+```java
+// Sieve: mark composites from i*i upward; everything left is prime.
+public boolean[] sieve(int n) {
+    boolean[] composite = new boolean[n + 1];
+    for (int i = 2; (long) i * i <= n; i++)
+        if (!composite[i])
+            for (int j = i * i; j <= n; j += i) // start at i*i, smaller multiples already marked
+                composite[j] = true;
+    return composite;
+}
+```
+
+> [!TIP]
+> For substring search in an interview, the expected answer is usually "the built-in `IndexOf` is fine, and if the interviewer wants the linear-time guarantee I would reach for KMP". Volunteering Manacher or Z only when the constraints demand them reads as judgement rather than trivia.
+
+> [!WARNING]
+> Rabin-Karp is `O(n + m)` on average but degrades to `O(nm)` on hash collisions, so always verify a hash match by comparing the actual characters. Interviewers who know the algorithm will ask specifically about that verification step.
 
 ## Cheat sheet
 
@@ -255,7 +287,7 @@ Because every row's hash-bucket counter only ever increases on insert, and the q
 
 ### Q5. Why is HyperLogLog able to estimate cardinality in roughly constant space, when a hash set would need space proportional to the number of distinct elements?
 
-Because it never stores the actual elements — it only tracks, per register, the position of the leftmost zero bit (or run of leading zeros) seen in the hashed values routed to that register. That single statistic is a probabilistic proxy for cardinality: the more distinct elements hashed into a register, the more likely a longer run of leading zeros has appeared. Averaging that estimator across many independent registers cancels out the variance any single register would have. The trade is that HyperLogLog can never tell you which elements were seen or provide an exact count — only a statistically bounded estimate — which is acceptable for analytics-style questions like unique visitor counts.
+Because it never stores the actual elements — it only tracks, per register, the longest leading-zero run (the position of the first `1` bit) seen in the hashed values routed to that register. That single statistic is a probabilistic proxy for cardinality: the more distinct elements hashed into a register, the more likely a longer run of leading zeros has appeared. Averaging that estimator across many independent registers cancels out the variance any single register would have. The trade is that HyperLogLog can never tell you which elements were seen or provide an exact count — only a statistically bounded estimate — which is acceptable for analytics-style questions like unique visitor counts.
 
 ### Q6. What's the core structural difference between a skip list and a balanced binary search tree, given both offer expected/worst-case O(log n) operations?
 

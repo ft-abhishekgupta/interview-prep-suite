@@ -45,7 +45,7 @@ A metrics monitoring platform collects performance data (CPU, memory, throughput
 | Dashboard query QPS (peak) | 3× average | 5,000 × 3 | ~15,000 queries/sec |
 | Read : write ratio | 15,000 : 5,000,000 | — | ~1 : 333 (write-heavy) |
 | Raw ingestion bandwidth | 5M points/sec × ~100 bytes (batched) | 5,000,000 × 100B | ~500MB/sec |
-| Raw storage/day (pre-compression) | 5M/sec × 16B/point × 86,400s | 5,000,000 × 16 × 86,400 | ~6.9TB/day |
+| Encoded sample storage/day (pre-compression) | 5M/sec × 16B encoded sample × 86,400s | 5,000,000 × 16 × 86,400 | ~6.9TB/day |
 | Retained storage/day (~5× TSDB compression) | 6.9TB ÷ 5 | 6.9TB / 5 | ~1.4TB/day |
 
 > [!TIP]
@@ -83,7 +83,7 @@ A `Series` is the unit everything else is built on: it's the unique combination 
 
 ## API design
 
-```
+```http
 POST /metrics/ingest
 {
   "metrics": [

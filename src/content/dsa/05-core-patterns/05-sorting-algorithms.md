@@ -15,11 +15,11 @@ You will rarely implement a sort from scratch in an interview, but you will be a
 | Insertion sort | `O(n)` | `O(n²)` | `O(n²)` | `O(1)` | ✅ | ✅ | Small or nearly-sorted input |
 | Selection sort | `O(n²)` | `O(n²)` | `O(n²)` | `O(1)` | ❌ | ✅ | Minimising number of swaps |
 | Merge sort | `O(n log n)` | `O(n log n)` | `O(n log n)` | `O(n)` | ✅ | ❌ | Stability required, linked lists, external sort |
-| Quicksort | `O(n log n)` | `O(n log n)` | `O(n²)` | `O(log n)` | ❌ | ✅ | General purpose, best average constant factor |
+| Quicksort | `O(n log n)` | `O(n log n)` | `O(n²)` | `O(log n)` average stack, `O(n)` worst | ❌ | ✅ | General purpose, best average constant factor |
 | Heapsort | `O(n log n)` | `O(n log n)` | `O(n log n)` | `O(1)` | ❌ | ✅ | Guaranteed `O(n log n)`, `O(1)` space |
-| Counting sort | `O(n + k)` | `O(n + k)` | `O(n + k)` | `O(k)` | ✅ | ❌ | Small integer range k |
-| Bucket sort | `O(n + k)` | `O(n + k)` | `O(n²)` | `O(n + k)` | ✅ | ❌ | Uniformly distributed values across a known range |
-| Radix sort | `O(nk)` | `O(nk)` | `O(nk)` | `O(n + k)` | ✅ | ❌ | Fixed-width integers/strings, k = digit count |
+| Counting sort | `O(n + k)` | `O(n + k)` | `O(n + k)` | `O(n + k)` | ✅ | ❌ | Small integer range k |
+| Bucket sort | `O(n + k)` expected | `O(n + k)` expected | `O(n²)` | `O(n + k)` | Depends on per-bucket sort | ❌ | Uniformly distributed values across a known range |
+| Radix sort | `O(d(n + b))` | `O(d(n + b))` | `O(d(n + b))` | `O(n + b)` | ✅ | ❌ | Fixed-width integers/strings, d = digit count, b = base |
 
 > [!KEY]
 > Comparison-based sorting has a proven lower bound of `Ω(n log n)` — you cannot beat it without exploiting structure in the data (like a bounded integer range, which is what counting and radix sort exploit).
@@ -50,7 +50,7 @@ Its worst case is `O(n²)`, the same as bubble and selection sort, but its best 
 Quicksort picks a pivot, partitions the array so everything smaller is left of it and everything larger is right, then recurses on both sides.
 
 ```java
-// Average O(n log n), worst O(n^2), O(log n) space for the recursion stack
+// Average O(n log n), worst O(n^2), O(log n) average stack space (O(n) worst)
 public void quickSort(int[] arr, int lo, int hi) {
     if (lo >= hi) return;
     int p = partition(arr, lo, hi);
@@ -131,13 +131,13 @@ public int[] countingSort(int[] arr, int maxValue) {
 }
 ```
 
-**Bucket sort** takes a different approach, suited to uniformly distributed values (including floats): scatter elements into `k` buckets by value range, sort each small bucket with insertion sort, then concatenate the buckets in order. With `n` elements spread evenly across `n` buckets, each bucket holds `O(1)` elements on average, giving `O(n)` expected time — but a skewed distribution that dumps everything into one bucket degrades to `O(n²)`, since you are then just running insertion sort on the whole array.
+Counting sort assumes integer keys from a small known range; if values can be negative, offset them by `-minValue` before indexing the count array. **Bucket sort** takes a different approach, suited to uniformly distributed values (including floats): scatter elements into `k` buckets by value range, sort each small bucket with insertion sort, then concatenate the buckets in order. It is stable only if the per-bucket sort is stable and equal keys stay in insertion order. With `n` elements spread evenly across `n` buckets, each bucket holds `O(1)` elements on average, giving `O(n)` expected time — but a skewed distribution that dumps everything into one bucket degrades to `O(n²)`, since you are then just running insertion sort on the whole array.
 
 | Sort | Escapes Ω(n log n) how | Degrades when |
 |---|---|---|
 | Counting sort | Indexes directly by value | Value range `k` is much larger than `n` |
 | Bucket sort | Buckets by value range, sorts each small bucket | Values cluster into a few buckets |
-| Radix sort | Repeated stable counting sort per digit | Keys have many digits/characters |
+| Radix sort | Repeated stable counting sort per digit | Keys have many digits/characters or a large base |
 
 ## Sorting with custom comparators in Java
 
@@ -184,9 +184,9 @@ When data does not fit in memory, sort it in chunks: read a chunk that fits in R
 
 ## Cheat sheet
 
-- Comparison sorts cannot beat `Ω(n log n)` worst case; counting/radix sort escape this by not comparing elements.
+- Comparison sorts cannot beat `Ω(n log n)` worst case; counting/radix sort escape this by using bounded integer/digit structure instead of comparing elements.
 - Merge sort: `O(n log n)` guaranteed in every case, stable, needs `O(n)` extra space — the safe default when stability matters.
-- Quicksort: fastest average case, `O(log n)` space, but `O(n²)` worst case on an adversarial or already-sorted input unless the pivot is randomised.
+- Quicksort: fastest average case, `O(log n)` average stack space, but `O(n²)` time and `O(n)` stack in the worst case on an adversarial or already-sorted input unless the pivot is randomised.
 - Heapsort: `O(n log n)` guaranteed, `O(1)` space, not stable — the choice when memory is tight and stability doesn't matter.
 - Counting sort: `O(n + k)`, only viable when the key range `k` is small relative to `n`.
 - Bucket sort: `O(n)` expected on uniformly distributed data, degrades to `O(n²)` if values cluster into few buckets.

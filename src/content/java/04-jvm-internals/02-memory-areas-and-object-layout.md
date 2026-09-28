@@ -60,7 +60,7 @@ flowchart LR
 
 The header is 12 bytes with compressed class pointers, and alignment rounds objects to 8 bytes. That has real consequences people underestimate:
 
-The mark word deserves a mention because it does double duty: it stores the identity hash code once computed, the GC age used for promotion decisions, and the object's lock state — biased, thin (a pointer to a stack lock record) or fat (inflated to a monitor). That's why calling `System.identityHashCode` or synchronising on an object is not free of memory semantics, and why the header can't simply be omitted.
+The mark word deserves a mention because it does double duty: it stores the identity hash code once computed, the GC age used for promotion decisions, and the object's lock state — thin (a pointer to a stack lock record) or fat (inflated to a monitor), with biased locking only a historical mode disabled in modern JDKs. That's why calling `System.identityHashCode` or synchronising on an object is not free of memory semantics, and why the header can't simply be omitted.
 
 | Thing | Approx. size | Why |
 |---|---|---|
@@ -115,7 +115,7 @@ String b = a.intern();                 // canonical pooled instance
 
 The single most-missed point: heap is **not** the whole footprint. Total resident memory is:
 
-```
+```text
 heap  +  metaspace  +  code cache  +  thread stacks  +  direct buffers  +  GC structures
 ```
 

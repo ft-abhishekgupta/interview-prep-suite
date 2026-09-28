@@ -9,7 +9,7 @@ Most DP interview questions are a variation on a small number of well-known shap
 
 ## How to use this catalogue
 
-Read the problem for these signals: does an item get used once or unlimited times? Is order fixed (subsequence) or free (subset)? Is the answer over a contiguous range (interval) or a full assignment (bitmask)? Those questions narrow the field to one or two rows below.
+Read the problem for these signals: does an item get used once or unlimited times? Is order fixed (subsequence) or free (subset)? Is the answer over a contiguous range (interval) or a full assignment (bitmask)? Those questions narrow the field to one or two catalogue entries.
 
 ```mermaid
 flowchart TD
@@ -31,9 +31,9 @@ flowchart TD
 
 | Pattern | State | Recurrence | Notes |
 |---|---|---|---|
-| 0/1 knapsack | `dp[i][w]` = best value using first `i` items, capacity `w` | `dp[i][w] = max(dp[i-1][w], dp[i-1][w-wt[i]] + val[i])` | Each item used at most once; space-optimise by iterating `w` **backward** |
+| 0/1 knapsack | `dp[i][w]` = best value using first `i` items, capacity `w` | `dp[i][w] = max(dp[i-1][w], dp[i-1][w-wt[i-1]] + val[i-1])` when `wt[i-1] <= w`, else skip | Each item used at most once; space-optimise by iterating `w` **backward** |
 | Unbounded knapsack | `dp[w]` = best value with capacity `w` | `dp[w] = max(dp[w], dp[w-wt[i]] + val[i])` | Item reusable; iterate `w` **forward** |
-| Subset sum | `dp[i][s]` = can first `i` items make sum `s` | `dp[i][s] = dp[i-1][s] \|\| dp[i-1][s-num[i]]` | Boolean version of 0/1 knapsack |
+| Subset sum | `dp[i][s]` = can first `i` items make sum `s` | `dp[i][s] = dp[i-1][s] \|\| dp[i-1][s-num[i-1]]` when `num[i-1] <= s`, else skip | Boolean version of 0/1 knapsack |
 | Partition equal subset sum | Subset sum with `target = total / 2` | Same as subset sum | Reject immediately if `total` is odd |
 | Coin change (min coins) | `dp[a]` = min coins to make amount `a` | `dp[a] = min(dp[a], dp[a-coin] + 1)` | Unbounded reuse of each coin |
 | Coin change (count ways) | `dp[a]` = number of ways to make `a` | `dp[a] += dp[a-coin]` | Loop coins **outer**, amount inner, to avoid counting permutations as distinct |
@@ -82,7 +82,7 @@ Both are `O(m·n)` time, space-optimisable to `O(min(m, n))` since each row only
 | Pattern | State | Recurrence | Fill order |
 |---|---|---|---|
 | Is `s[l..r]` a palindrome | `dp[l][r]` = boolean | `dp[l][r] = (s[l]==s[r]) && dp[l+1][r-1]` | Increasing length, or `l` from right to left, `r` left to right |
-| Longest palindromic substring | Track max length while filling the table above | Same | Same |
+| Longest palindromic substring | Track max length while filling the palindrome table | Same | Same |
 | Longest palindromic subsequence | `dp[l][r]` = length | If `s[l]==s[r]`: `dp[l+1][r-1] + 2`, else `max(dp[l+1][r], dp[l][r-1])` | Same |
 
 > [!WARNING]
@@ -165,6 +165,10 @@ for (int mask = 1; mask < (1 << n); mask++)
     }
 ```
 
+## Iteration order is part of the recurrence
+
+Most wrong DP tables use the right recurrence with the wrong fill order. If a state reads `i - 1`, fill `i` increasing. If it reads a shorter interval, fill by increasing length. If a 1-D rolling array is standing in for the previous row, choose the loop direction that preserves the old row values you still need. This is why 0/1 knapsack goes backward, unbounded knapsack goes forward, palindrome DP grows from short substrings to long substrings, and bitmask DP can iterate masks from small to large because every predecessor mask has fewer set bits.
+
 ## Pattern-to-state master table
 
 | Problem shape | Signal words | State | Time |
@@ -196,7 +200,7 @@ for (int mask = 1; mask < (1 << n); mask++)
 | Mistake | Fix |
 |---|---|
 | Filling interval DP row-by-row instead of by range length | Loop `len` from 2 to `n`, deriving `i, j` from it |
-| Using 0/1 knapsack's forward loop for an unbounded problem | Forward reuses items; backward restricts to one use |
+| Using the unbounded knapsack forward loop for a 0/1 problem | Forward reuses items; backward restricts each item to one use |
 | Forgetting the `O(n log n)` LIS reconstructs a *length*, not the actual subsequence | Keep a parallel `parent[]` array if the sequence itself is needed |
 | Mixing up edit distance's three operations | Insert/delete/replace map to `dp[i][j-1]`, `dp[i-1][j]`, `dp[i-1][j-1]` respectively |
 | Applying bitmask DP when n > ~22 | `2ⁿ` explodes; look for a polynomial DP or greedy instead |

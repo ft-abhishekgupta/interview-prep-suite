@@ -101,6 +101,49 @@ ReadOnlySpan<char> word = text.AsSpan(6, 5);  // "world" without allocating a su
 
 `stackalloc` is dangerous with large or unbounded sizes — it can overflow the 1 MB stack just like deep recursion, so it is normally reserved for small, bounded buffers.
 
+## Strings: immutability, interning and StringBuilder
+
+`string` is a **reference type that behaves like a value**: every instance is immutable, so any operation that appears to modify a string allocates a brand new one on the heap and leaves the original for the garbage collector. This is the single most common accidental-allocation source in .NET code.
+
+```csharp
+// O(n^2) — each += allocates a new string and copies everything before it.
+var s = "";
+foreach (var part in parts) s += part;          // 10,000 parts -> ~50M chars copied
+
+// O(n) — one growable buffer, one final allocation.
+var sb = new StringBuilder();
+foreach (var part in parts) sb.Append(part);
+var result = sb.ToString();
+```
+
+The crossover is lower than people expect: for a handful of concatenations the compiler rewrites `a + b + c` into a single `String.Concat` call and `StringBuilder` is pure overhead. Reach for `StringBuilder` when the count is **unbounded or loop-driven**, not when it is a fixed three pieces.
+
+**Interning** is a runtime-wide table of unique string instances. Compile-time literals are interned automatically, which is why reference equality can surprise you:
+
+```csharp
+var a = "hello";
+var b = "hello";
+Console.WriteLine(ReferenceEquals(a, b));          // True  - same interned literal
+var c = new string(['h','e','l','l','o']);
+Console.WriteLine(ReferenceEquals(a, c));          // False - built at runtime
+Console.WriteLine(a == c);                         // True  - == compares content
+Console.WriteLine(ReferenceEquals(a, string.Intern(c)));  // True - forced into the pool
+```
+
+| Operation | Allocates | Notes |
+|---|---|---|
+| `s1 + s2` (few, fixed) | One result | Compiler folds into `String.Concat` |
+| `+=` inside a loop | One per iteration | `O(n^2)` total copying — the classic bug |
+| `StringBuilder.Append` | Amortised, buffer doubles | `O(n)` total; pre-size with the capacity ctor if you know the length |
+| `Substring` | New string | Use `AsSpan().Slice()` to avoid the copy when you only read |
+| `string.Intern` | Nothing new | Pins the string for the process lifetime — a leak if you intern user input |
+
+> [!WARNING]
+> `string.Intern` puts the string in a table that lives as long as the process and is **never** collected. Interning user-supplied or high-cardinality values is a slow memory leak. This is a favourite follow-up once a candidate mentions interning.
+
+> [!TIP]
+> For parsing and slicing hot paths, `ReadOnlySpan<char>` over the existing string gives you substring semantics with **zero allocation**, because a span is a view rather than a copy. Naming that trade-off is what separates a senior answer from "use StringBuilder".
+
 ## The Large Object Heap
 
 Objects **85,000 bytes or larger** are allocated on the **Large Object Heap (LOH)** instead of the normal generational heap. The LOH is collected only during a full (Gen 2) collection and, historically, was never compacted by default — meaning repeated allocation/deallocation of large arrays could fragment it. Since .NET Core, the LOH *can* be compacted on demand (`GCSettings.LargeObjectHeapCompactionMode`), but it is still comparatively expensive to collect.
@@ -223,4 +266,4 @@ I'd start by capturing GC statistics (via `dotnet-counters`, `dotnet-trace`, or 
 
 ### Q12. Why does the phrase "structs avoid garbage collection" oversell what structs actually do?
 
-Structs avoid *heap allocation* only when the struct itself is stored somewhere that isn't the heap — a local variable, a parameter, or an element of an array that is itself a local. The moment a struct is boxed (assigned to `object`/an interface), stored as a field of a class, or captured in a closure, it becomes part of a heap allocation just like a class would be, and is subject to GC just the same. Additionally, using structs doesn't eliminate all cost: large structs copied repeatedly by value (through method calls, `foreach` iteration, or array reads) can cost more in raw CPU time from copying than a class reference would, even though no GC is involved. The accurate, senior framing is "structs avoid *an extra, independent* heap allocation for the value itself" — not "structs make garbage collection go away."
+Structs avoid *heap allocation for the value itself* only when the storage location is not on the heap — for example, a local variable, a parameter, a `stackalloc` buffer, or a field inside another stack-resident struct. The moment a struct is boxed (assigned to `object`/an interface), stored in a heap array, stored as a field of a class, or captured in a closure, it becomes part of a heap allocation and is subject to GC reachability just the same. Additionally, using structs doesn't eliminate all cost: large structs copied repeatedly by value (through method calls, `foreach` iteration, or array reads) can cost more in raw CPU time from copying than a class reference would, even though no extra object allocation occurs. The accurate, senior framing is "structs avoid *an extra, independent* heap allocation for the value itself" — not "structs make garbage collection go away."

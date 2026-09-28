@@ -72,11 +72,11 @@ flowchart LR
 ```
 
 - **Single-leader, cross-region replicas**: one region is the source of truth for writes, others hold read-only replicas. Simple, no write conflicts, but writes from a distant region pay the full cross-region round trip.
-- **Multi-leader (active-active)**: every region accepts writes locally, replicating asynchronously to others. Fast local writes everywhere, but **concurrent writes to the same entity in different regions can conflict** — resolved via last-write-wins (simple, can lose data — see the clocks page), vector clocks/CRDTs (detect/merge properly), or application-level merge logic.
+- **Multi-leader (active-active)**: every region accepts writes locally, replicating asynchronously to others. Fast local writes everywhere, but **concurrent writes to the same entity in different regions can conflict** — resolved via last-write-wins (simple, can lose data when clocks disagree), vector clocks/CRDTs (detect/merge properly), or application-level merge logic.
 - **Consensus-based (e.g. Spanner)**: uses a quorum across regions for every write, giving strong consistency globally — at the cost of every write paying a cross-region round trip for the quorum, which is inherently slower than either option above.
 
 > [!DANGER]
-> Multi-leader replication silently reintroduces every isolation anomaly discussed on the clocks and sagas pages — lost updates, dirty reads of soon-to-be-reverted data — except now the conflicting writes can be tens or hundreds of milliseconds apart in wall-clock time and still be genuinely concurrent, because that's roughly the cross-region replication lag.
+> Multi-leader replication silently reintroduces isolation anomalies — lost updates, dirty reads of soon-to-be-reverted data — except now the conflicting writes can be tens or hundreds of milliseconds apart in wall-clock time and still be genuinely concurrent, because that's roughly the cross-region replication lag.
 
 ## Cross-region latency reality check
 
@@ -160,7 +160,7 @@ GeoDNS routes users to a region based on their location by returning different I
 
 ### Q4. What conflict resolution strategies exist for multi-leader (active-active) replication, and how would you choose between them?
 
-Last-write-wins is the simplest — keep whichever write has the later timestamp — but as covered on the clocks page, cross-region clock skew means "later timestamp" often isn't the true causal winner, so LWW can silently discard a legitimate concurrent write; it's acceptable only where losing an update is cheap. Vector clocks (or CRDTs for specific data types like counters and sets) detect true concurrency and either surface both versions to the application or merge them mathematically without loss, at the cost of extra metadata and engineering complexity. Application-level merge logic encodes domain knowledge directly — e.g. merging two concurrently-modified shopping carts by unioning their items rather than picking one wholesale. I'd choose based on how costly silent data loss is for that specific entity: cheap/ephemeral data can use LWW, anything a user would notice losing needs vector clocks/CRDTs or explicit merge logic.
+Last-write-wins is the simplest — keep whichever write has the later timestamp — but cross-region clock skew means "later timestamp" often isn't the true causal winner, so LWW can silently discard a legitimate concurrent write; it's acceptable only where losing an update is cheap. Vector clocks (or CRDTs for specific data types like counters and sets) detect true concurrency and either surface both versions to the application or merge them mathematically without loss, at the cost of extra metadata and engineering complexity. Application-level merge logic encodes domain knowledge directly — e.g. merging two concurrently-modified shopping carts by unioning their items rather than picking one wholesale. I'd choose based on how costly silent data loss is for that specific entity: cheap/ephemeral data can use LWW, anything a user would notice losing needs vector clocks/CRDTs or explicit merge logic.
 
 ### Q5. What is split brain in a multi-region context, and how do you prevent it?
 

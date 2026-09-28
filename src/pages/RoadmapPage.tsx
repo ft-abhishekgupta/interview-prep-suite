@@ -21,8 +21,8 @@ const PLAN: Phase[] = [
   {
     label: 'Week 2–3',
     title: 'Own your résumé',
-    goal: 'Every bullet on your CV is an interview question. Write the architecture, the trade-offs and the numbers down before you are asked — your own systems guide is the raw material.',
-    sections: ['resume', 'xbox-systems'],
+    goal: 'Every bullet on your CV is an interview question. Write the architecture, the trade-offs and the numbers down before you are asked.',
+    sections: ['resume'],
   },
   {
     label: 'Week 3–5',
@@ -58,13 +58,13 @@ const PLAN: Phase[] = [
     label: 'Week 9–10',
     title: 'Modern and supporting skills',
     goal: 'AI engineering is now a differentiator; security, DevOps, observability and testing round out the senior profile.',
-    sections: ['ai-engineering', 'observability', 'security', 'devops', 'testing', 'frontend', 'fundamentals'],
+    sections: ['ai-engineering', 'observability', 'security', 'devops', 'testing', 'frontend', 'languages', 'fundamentals'],
   },
   {
     label: 'Week 10+',
-    title: 'The human rounds',
-    goal: 'Build a STAR story bank, rehearse leadership and failure narratives, and prepare for the hiring-manager conversation.',
-    sections: ['behavioural'],
+    title: 'The human rounds and the loop',
+    goal: 'Build a STAR story bank, rehearse leadership and failure narratives, prepare for the hiring-manager conversation, and drill the loop itself with the revision one-pagers.',
+    sections: ['behavioural', 'interview-process'],
   },
 ];
 

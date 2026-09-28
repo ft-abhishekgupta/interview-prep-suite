@@ -223,7 +223,7 @@ Preventing race conditions and keeping data consistent escalates through concurr
 
    ![alt text](notes/05-HighLevelDesign/SystemDesign/image-23.png)
 
-4. **Locking outside the database.** Hold the lock as data instead of inside a transaction when its lifetime needs to outlive one — a **distributed lock**. Redis with a TTL is in-memory and quick; a database column can record who's holding it; Zookeeper won't double-grant or corrupt data but adds real operational overhead.
+4. **Locking outside the database.** Hold the lock as data instead of inside a transaction when its lifetime needs to outlive one — a **distributed lock**. Redis with a TTL is in-memory and quick; a database column can record who's holding it; ZooKeeper/etcd give session-bound ownership but add real operational overhead. When a lock protects an external resource, pass a monotonically increasing **fencing token** so a paused old holder's write is rejected after a newer holder takes over.
 
    ![alt text](notes/05-HighLevelDesign/SystemDesign/image-24.png)
 

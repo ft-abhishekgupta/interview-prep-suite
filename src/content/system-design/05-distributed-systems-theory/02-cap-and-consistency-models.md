@@ -46,7 +46,8 @@ Consistency is not binary. Real systems pick a point on a spectrum, and picking 
 
 | Model | Guarantee | Example use |
 |---|---|---|
-| **Linearizable / strong** | Every read sees the latest write, globally, as if there were one copy | Bank balance, inventory count, leader election |
+| **Linearizable (single-object strong)** | Every read of one object sees the latest completed write in real-time order, as if there were one copy | Bank balance field, inventory counter, leader election key |
+| **Serializable** | Transactions behave as if they executed one at a time, but not necessarily in real-time order unless strict serializable | Multi-row database transactions |
 | **Sequential** | All nodes see operations in the *same* order, not necessarily real-time order | Distributed logs, some replicated state machines |
 | **Causal** | Operations that are causally related are seen in order everywhere; unrelated ones may reorder | Comment appears after the post it replies to |
 | **Read-your-writes** | A user always sees their own writes, even if other users see them late | You see your own comment immediately after posting |
@@ -57,11 +58,14 @@ Consistency is not binary. Real systems pick a point on a spectrum, and picking 
 > [!WARNING]
 > "Eventual consistency" does not specify a bound on *how* eventual — it could be milliseconds or, in a network partition, much longer. If a design needs a bound, say "bounded staleness" or a specific SLA, not just "eventual".
 
+> [!NOTE]
+> Linearizability and serializability solve different problems: linearizability is about real-time ordering for a single object/register, while serializability is about whether multi-object transactions are equivalent to some serial execution. **Strict serializability** combines both.
+
 ## Quorum reads and writes
 
 For leaderless/multi-replica systems, you tune consistency **per operation** using a quorum: with `N` replicas, `W` write acknowledgments required, and `R` read acknowledgments required, the classic rule is:
 
-**`W + R > N` guarantees the read set and the write set overlap by at least one replica — so at least one node in any read quorum has seen the latest write.**
+**`W + R > N` guarantees the read set and the write set overlap by at least one replica.** That overlap is what lets a read observe the latest acknowledged write or provide read-your-writes, assuming the write reached `W` replicas, the read compares versions and the system is not using sloppy quorums. It is not, by itself, the same as serializable transactions.
 
 ```mermaid
 flowchart LR
@@ -78,7 +82,7 @@ flowchart LR
 
 | Configuration | Behavior | Trade-off |
 |---|---|---|
-| `W=1, R=N` | Write-optimized, fast writes | Slow, but strongly consistent reads |
+| `W=1, R=N` | Write-optimized, fast writes | Slow reads; can observe the latest acknowledged write if versions are compared |
 | `W=N, R=1` | Read-optimized, fast reads | Slow writes; any replica down blocks writes |
 | `W=R=⌈(N+1)/2⌉` *(balanced default)* | Majority for both | Tolerates minority failures either way |
 | `W + R ≤ N` | Faster, but **no consistency guarantee** | Pure eventual consistency, tunable for speed |
@@ -108,8 +112,8 @@ Walk the interviewer through this decision per **field or workflow**, not for th
 
 - CAP: partition tolerance is **mandatory** in practice — the real choice is C vs A **only during a partition**.
 - **PACELC** captures the trade-off that actually matters most of the time: latency vs consistency, even with no partition.
-- The spectrum, strongest to weakest: **linearizable → sequential → causal → read-your-writes → monotonic reads → bounded staleness → eventual**.
-- **Quorum rule: `W + R > N`** guarantees overlap between write and read sets — the basis of tunable consistency.
+- The spectrum, strongest to weakest: **linearizable/strict-serializable → serializable → sequential → causal → read-your-writes → monotonic reads → bounded staleness → eventual**.
+- **Quorum rule: `W + R > N`** guarantees overlap between write and read sets — the basis of tunable latest-version/read-your-writes consistency.
 - "Eventual consistency" has **no built-in time bound** — say "bounded staleness" if you need one.
 - Pick consistency **per field/workflow**, not for the whole system — a payment ledger and a like counter don't need the same guarantee.
 - **Read-your-writes** is usually solved by routing a user's own reads to the primary or a session-pinned replica, not by making everything strongly consistent.
@@ -122,12 +126,12 @@ Walk the interviewer through this decision per **field or workflow**, not for th
 | Treating consistency as all-or-nothing for the whole system | Choose per field/workflow — most systems mix strong and eventual |
 | Saying "eventually consistent" with no bound | Specify bounded staleness or an SLA if one is needed |
 | Ignoring PACELC and only discussing the partition case | Mention the latency-vs-consistency trade-off during normal operation too |
-| Assuming quorum systems are automatically strongly consistent | Only true if `W + R > N`; otherwise it's tunable, possibly weaker |
+| Assuming quorum systems are automatically strongly consistent | Overlap needs `W + R > N` plus version reconciliation; it is not the same as serializable transactions |
 | Solving read-your-writes by making everything strongly consistent | Route that user's own reads to the primary or use session consistency |
 
 ## Summary
 
-CAP theorem only forces a choice between consistency and availability during an actual network partition — partition tolerance itself is not optional in any real distributed system, so the useful conversation is about what happens when packets are dropped, and PACELC extends that conversation to the far more common case of trading latency for consistency even when the network is healthy. Consistency is a spectrum, not a switch, running from linearizable down to plain eventual, with read-your-writes, causal and bounded-staleness models solving specific real product needs in between. Quorum systems (`W + R > N`) let you tune where a given operation sits on that spectrum per request. The senior move is choosing the right point on the spectrum for each field or workflow in a design, not declaring the whole system strong or eventual.
+CAP theorem only forces a choice between consistency and availability during an actual network partition — partition tolerance itself is not optional in any real distributed system, so the useful conversation is about what happens when packets are dropped, and PACELC extends that conversation to the far more common case of trading latency for consistency even when the network is healthy. Consistency is a spectrum, not a switch, running from linearizable or strict-serializable guarantees down to plain eventual, with read-your-writes, causal and bounded-staleness models solving specific real product needs in between. Quorum systems (`W + R > N`) give read/write overlap for latest-version reads when versions are reconciled. The senior move is choosing the right point on the spectrum for each field or workflow in a design, not declaring the whole system strong or eventual.
 
 ## Top Interview Questions
 
@@ -141,11 +145,11 @@ PACELC extends CAP: if there's a **P**artition, choose **A**vailability or **C**
 
 ### Q3. Walk through the consistency spectrum from strongest to weakest, with an example for each.
 
-Linearizable/strong consistency means every read sees the most recent write as if there were a single copy of the data — used for bank balances or leader election, where staleness is unacceptable. Sequential consistency guarantees all nodes agree on one global order of operations, though not necessarily real-time order. Causal consistency preserves the order of operations that are causally related (a reply appears after the comment it replies to) while allowing unrelated operations to be seen in different orders on different nodes. Read-your-writes guarantees a user always sees their own writes immediately, even if others see them with delay. Monotonic reads guarantee you never see data "go backward" in time on successive reads. Bounded staleness caps how far behind a read can lag, in time or version count. Eventual consistency only guarantees convergence given no further writes, with no bound on how long that takes.
+Linearizability means every read of one object sees the most recent completed write in real-time order, as if there were a single copy — used for inventory counters or leader-election keys where stale ownership is unacceptable. Serializability is a transaction guarantee: multi-object transactions behave as if they ran one at a time, and strict serializability additionally respects real-time order. Sequential consistency guarantees all nodes agree on one global order of operations, though not necessarily real-time order. Causal consistency preserves the order of operations that are causally related (a reply appears after the comment it replies to) while allowing unrelated operations to be seen in different orders on different nodes. Read-your-writes guarantees a user always sees their own writes immediately, even if others see them with delay. Monotonic reads guarantee you never see data "go backward" in time on successive reads. Bounded staleness caps how far behind a read can lag, in time or version count. Eventual consistency only guarantees convergence given no further writes, with no bound on how long that takes.
 
-### Q4. Explain the quorum formula `W + R > N` and why it guarantees consistency.
+### Q4. Explain the quorum formula `W + R > N` and what it guarantees.
 
-With `N` total replicas, `W` is the number of replicas that must acknowledge a write before it's considered successful, and `R` is the number of replicas a read must query before returning a result. If `W + R > N`, the write set and any possible read set are guaranteed to overlap by at least one replica, because you can't select two disjoint subsets of size `W` and `R` from a set of size `N` if their sizes sum to more than `N`. That guaranteed overlap means at least one node in every read quorum has seen the most recent write, so the read is guaranteed to observe it (assuming appropriate versioning to pick the latest among the responses). If `W + R ≤ N`, no such overlap is guaranteed, and you've traded consistency for speed.
+With `N` total replicas, `W` is the number of replicas that must acknowledge a write before it's considered successful, and `R` is the number of replicas a read must query before returning a result. If `W + R > N`, the write set and any possible read set are guaranteed to overlap by at least one replica, because you can't select two disjoint subsets of size `W` and `R` from a set of size `N` if their sizes sum to more than `N`. That overlap means at least one node in every read quorum has seen the acknowledged write, so the coordinator can return the latest version among the responses and provide latest-write or read-your-writes behavior. The assumptions matter: versions must be compared, failed writes must not be treated as committed, and quorum overlap is not the same thing as serializable multi-row transactions.
 
 ### Q5. Give a concrete example of what "eventual consistency" looks like from a user's point of view, and when it's acceptable versus not.
 

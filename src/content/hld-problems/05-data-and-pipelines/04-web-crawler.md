@@ -77,11 +77,11 @@ erDiagram
     }
 ```
 
-`URL.status` plus `depth` is what makes crawling resumable and bounded: status tracks progress so a crash doesn't cause duplicate or lost work, and depth caps how far a single domain's link graph is followed, which is the primary defense against crawler traps (see below).
+`URL.status` plus `depth` is what makes crawling resumable and bounded: status tracks progress so a crash doesn't cause duplicate or lost work, and depth caps how far a single domain's link graph is followed, which is the primary defense against infinite crawler traps such as calendar pages and faceted search URLs.
 
 ## API design
 
-```
+```http
 POST /crawl/seed
 { "urls": ["https://example.com", ...] }
 -> 202 { "accepted": 2 }
@@ -145,7 +145,7 @@ Fetching and parsing are split into **separate stages** connected by a durable q
 
 A crawler that ignores site owners' stated preferences risks getting blocked or, worse, degrading the target site's own availability. Each domain publishes rules like:
 
-```
+```text
 User-agent: *
 Disallow: /private/
 Crawl-delay: 10

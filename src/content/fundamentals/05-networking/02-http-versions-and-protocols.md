@@ -57,7 +57,7 @@ That security is provided by **TLS (Transport Layer Security)**, the modern succ
 
 ![alt text](notes/02-ComputerNetworks/image-22.png)
 
-TLS mixes two kinds of cryptography to get there. **Asymmetric encryption** (RSA and similar) uses a public/private key pair — anyone can encrypt with the public key, but only the private key can decrypt — which is ideal for a handshake between two parties who have never met, but too slow for an entire session's worth of data. **Symmetric encryption** (AES, DES) uses one shared key for both directions and is far faster, so the handshake's real job is to use asymmetric crypto just long enough to safely agree on a symmetric session key, then switch to that key for the actual data transfer.
+TLS mixes asymmetric and symmetric cryptography. **Asymmetric cryptography** authenticates the server and, in modern TLS, helps run an ephemeral Diffie-Hellman key exchange; RSA/ECDSA signatures prove identity, but bulk data is not encrypted with the certificate's public key. **Symmetric encryption** (AES-GCM or ChaCha20-Poly1305) is far faster, so the handshake's real job is to agree fresh symmetric session keys safely, then use those keys for the actual data transfer.
 
 ![alt text](notes/02-ComputerNetworks/image-23.png)
 
@@ -67,7 +67,7 @@ That handshake also has to prove the server is who it claims to be, which is whe
 
 ![alt text](notes/02-ComputerNetworks/image-24.png)
 
-The signature itself is a **digital signature**: the CA hashes the certificate's contents and encrypts that hash with its own private key, and anyone can verify it by decrypting with the CA's public key and checking the hash matches — proving the certificate hasn't been altered and really was issued by that CA.
+The signature itself is a **digital signature**: the CA signs a hash of the certificate with its private key, and clients verify that signature with the CA's public key and check the hash matches — proving the certificate hasn't been altered and really was issued by that CA.
 
 ![alt text](notes/02-ComputerNetworks/image-25.png)
 
@@ -178,7 +178,7 @@ The decision usually reduces to three questions: does the client need to *send* 
 - Retry `5xx` with backoff; don't blindly retry `4xx` — the request itself is the problem.
 - Compression is a near-free win for text payloads, wasted effort for already-compressed binary formats.
 - Pick the simplest protocol that satisfies the actual directionality and latency need — not the most impressive one.
-- TLS uses asymmetric crypto (RSA) just long enough to agree a symmetric session key (AES), because symmetric is far faster for bulk data.
+- TLS uses asymmetric cryptography for authentication and key exchange, then symmetric ciphers such as AES-GCM or ChaCha20-Poly1305 for bulk data.
 - A CA-signed certificate proves identity via a digital signature; PKI is the whole trust chain of keys, certificates, and CAs behind it.
 - CORS is enforced by the browser, not the server — it stops malicious pages from reading cross-origin responses, nothing more.
 - `SameSite` cookies blunt CSRF; `HttpOnly` cookies blunt XSS session theft — different attacks, different attributes.
@@ -242,9 +242,9 @@ General-purpose compression (gzip, Brotli) works by finding and eliminating stat
 
 This needs genuine bidirectional, low-latency communication — every keystroke from any participant should reach the others as fast as possible, and participants also send data just as often as they receive it — so WebSockets is the right transport, not SSE or polling. I'd design the server to maintain a per-document channel that broadcasts operations (not full document snapshots, to keep messages small) to all connected clients, using an operational-transform or CRDT-based merge strategy to resolve concurrent edits without needing a central lock. For clients on networks that block WebSocket upgrades, I'd add a long-polling fallback so the feature degrades gracefully rather than failing outright, and I'd make sure reconnect logic can resynchronize a client's state (e.g. via a version/sequence number) after a dropped connection, since that's the scenario most likely to cause silent data divergence in production.
 
-### Q11. Why does TLS bother with slow asymmetric encryption at all if it's just going to switch to a symmetric key anyway?
+### Q11. Why does TLS use asymmetric cryptography if it switches to symmetric encryption for bulk data?
 
-Symmetric encryption needs both parties to already share the same secret key, which is exactly the problem at the start of a connection between two parties who've never communicated before — there's no existing secure channel to exchange that key over. Asymmetric encryption solves that specific bootstrapping problem: the server's public key can be shared openly, and the client can use it to encrypt a proposed session key (or, in modern TLS, both sides use key-exchange math like Diffie-Hellman) such that only the server's private key can recover it, giving both sides a shared secret without ever transmitting it in the clear. Once that symmetric key exists, there's no more bootstrapping problem to solve, so TLS switches to symmetric encryption for the bulk of the session purely because it's orders of magnitude faster per byte — using asymmetric crypto for the whole session would work but would be needlessly slow.
+Symmetric encryption needs both parties to already share the same secret key, which is exactly the problem at the start of a connection between two parties who've never communicated before. TLS uses asymmetric cryptography to solve that bootstrapping problem: certificates authenticate the server, and modern TLS uses ephemeral Diffie-Hellman key exchange so both sides derive the same fresh session secret without sending it directly over the network. Once that symmetric key material exists, TLS uses symmetric encryption for the bulk of the session because it is orders of magnitude faster per byte; asymmetric operations stay in the handshake and authentication path, not the data path.
 
 ### Q12. A frontend team says their API calls are being blocked by CORS, but the same API works fine from Postman. Why, and how would you fix it?
 

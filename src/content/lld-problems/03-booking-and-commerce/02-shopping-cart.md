@@ -231,11 +231,11 @@ public class CheckoutService {
     }
 
     public OrderResult checkout(Cart cart, String idempotencyKey, String region) {
-        OrderResult existing = completedByKey.get(idempotencyKey);
-        if (existing != null) {
-            return existing; // replay — do not charge or reserve again
-        }
+        return completedByKey.computeIfAbsent(idempotencyKey,
+            key -> performCheckout(cart, key, region));
+    }
 
+    private OrderResult performCheckout(Cart cart, String idempotencyKey, String region) {
         // Reserve every line, rolling back everything reserved so far on the first failure —
         // a partial reservation must never survive a failed checkout attempt.
         List<CartItem> reserved = new ArrayList<>();
@@ -254,7 +254,6 @@ public class CheckoutService {
             }
 
             OrderResult result = new OrderResult(UUID.randomUUID().toString(), price, payment.success());
-            completedByKey.put(idempotencyKey, result);
             cart.clear();
             return result;
         } catch (RuntimeException e) {
@@ -271,7 +270,7 @@ public class CheckoutService {
 
 Cart edits from multiple devices for the same user are the everyday case — a user adds an item on mobile, then opens the desktop site. A simple, honest approach is last-write-wins per line item with an optimistic version on the whole cart: each update includes the version it read, and a stale write either merges (increment quantity) or is rejected and retried against the latest version, rather than silently overwriting a concurrent addition.
 
-Checkout concurrency is where correctness really matters, and it reuses two patterns already established elsewhere in this series: `InventoryReservationService.tryReserve` must be an atomic per-unit claim (never check-then-decrement in two steps), and `CheckoutService` must dedupe on the idempotency key *before* doing anything with side effects — reservation and payment both — so a retried request is a pure read of the cached result, not a re-execution.
+Checkout concurrency is where correctness really matters, and it reuses two patterns already established elsewhere in this series: `InventoryReservationService.tryReserve` must be an atomic per-unit claim (never check-then-decrement in two steps), and `CheckoutService` must dedupe atomically on the idempotency key *before* doing anything with side effects — reservation and payment both — so two concurrent retries cannot both pass an initial cache check and re-execute.
 
 `tryReserve` is typically one conditional update at the storage layer rather than a read followed by a write, so two simultaneous checkouts for the last unit can't both succeed:
 

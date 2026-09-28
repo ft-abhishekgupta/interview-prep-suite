@@ -107,16 +107,19 @@ public class QueueWithStacks {
 }
 ```
 
-Each element moves from `_in` to `_out` at most once, so while a single `Dequeue` can be `O(n)` in the worst case, the **amortised** cost per operation across a sequence is `O(1)`.
+Each element moves from `in` to `out` at most once, so while a single `dequeue` can be `O(n)` in the worst case, the **amortised** cost per operation across a sequence is `O(1)`.
 
 ## Circular buffer
 
-A **circular (ring) buffer** implements a fixed-capacity queue on a plain array by wrapping indices with modulo arithmetic instead of shifting elements — this is what `ArrayDeque` uses internally.
+A **circular (ring) buffer** implements a queue on a plain array by wrapping indices with modulo arithmetic instead of shifting elements. Java's `ArrayDeque` uses the same wraparound idea but grows when full; fixed-capacity ring buffers in logging or telemetry systems often choose to overwrite the oldest value instead.
 
 ```java
-public class CircularBuffer {
+public class OverwritingRingBuffer {
     private final int[] buf; private int head, size;
-    public CircularBuffer(int capacity) { buf = new int[capacity]; }
+    public OverwritingRingBuffer(int capacity) {
+        if (capacity <= 0) throw new IllegalArgumentException("capacity must be positive");
+        buf = new int[capacity];
+    }
     public void enqueue(int x) {
         int tail = (head + size) % buf.length;
         buf[tail] = x;
@@ -146,6 +149,16 @@ public int[] maxSlidingWindow(int[] nums, int k) {
 }
 ```
 
+## Java API details that matter
+
+Prefer `offer`/`poll`/`peek` when using a deque as a queue because they make the empty-case behaviour explicit: `poll` and `peek` return `null`, while `remove` and `element` throw. For a stack, `push`, `pop` and `peek` are idiomatic on `Deque`, but `pop` still throws on empty, so guard with `isEmpty()` unless the problem guarantees valid operations.
+
+`ArrayDeque` does **not** allow `null` elements. That is a feature for interview code: a `null` return from `poll()` unambiguously means "empty", not "the next item was null". If you genuinely need to store nulls, use a different representation, but for algorithm problems values are normally primitives or non-null objects, so `ArrayDeque` remains the default.
+
+Also remember that `ArrayDeque` is not thread-safe; that is fine for coding interviews and most single-threaded algorithms. If a production queue crosses threads, choose a concurrent queue from `java.util.concurrent` instead of adding ad-hoc synchronization around interview-style code.
+
+Finally, name the end you are using in comments while coding. Bugs often come from mixing `offer` with `pop` or `push` with `pollLast`, accidentally reversing the intended order.
+
 ## BFS uses a queue, DFS uses a stack
 
 This is worth stating explicitly because it explains *why* each traversal has its characteristic shape: BFS explores level-by-level because a queue preserves discovery order (first-discovered, first-explored), while DFS plunges depth-first because a stack (or the recursion call stack) always explores the most-recently-discovered node next.
@@ -170,7 +183,7 @@ This is worth stating explicitly because it explains *why* each traversal has it
 
 | Mistake | Fix |
 |---|---|
-| Dequeue via `ArrayList.remove(0)` | Use `ArrayDeque` (circular buffer), not a list |
+| Dequeuing via `ArrayList.remove(0)` | Use `ArrayDeque` (circular buffer), not a list |
 | Forgetting a monotonic stack holds indices, not values | Store indices so you can compute distances/widths later |
 | Popping from an empty stack/queue without checking | `pop`/`remove` throw — use `peek`/`poll` (which return `null`) or check `isEmpty()` |
 | Recomputing the minimum on every `getMin()` call | Track the running min alongside each push |
@@ -201,7 +214,7 @@ Store, alongside each pushed value, the minimum of the entire stack up to and in
 
 ### Q5. How would you implement a FIFO queue using two stacks, and what's the amortised complexity?
 
-Keep two stacks, `in` and `out`. `Enqueue` always pushes onto `in`. `Dequeue` pops from `out`; if `out` is empty, first pour every element from `in` into `out` (which reverses their order back to FIFO), then pop from `out`. Each element is moved from `in` to `out` at most once over its lifetime, so while any single `Dequeue` call can be `O(n)` in the worst case (when it triggers the pour), the total work across `n` operations is `O(n)`, giving **amortised O(1)** per operation — the same argument used for dynamic array resizing.
+Keep two stacks, `in` and `out`. `enqueue` always pushes onto `in`. `dequeue` pops from `out`; if `out` is empty, first pour every element from `in` into `out` (which reverses their order back to FIFO), then pop from `out`. Each element is moved from `in` to `out` at most once over its lifetime, so while any single `dequeue` call can be `O(n)` in the worst case (when it triggers the pour), the total work across `n` operations is `O(n)`, giving **amortised O(1)** per operation — the same argument used for dynamic array resizing.
 
 ### Q6. What is a monotonic deque, and how does it solve sliding-window maximum in O(n)?
 

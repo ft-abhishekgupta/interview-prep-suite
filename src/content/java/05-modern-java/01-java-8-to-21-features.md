@@ -71,7 +71,7 @@ System.out.println("  hi  ".strip());         // Java 11
 
 ### Java 12–17 — the pattern-matching era
 
-A cluster of features previewed across 12–16 and landed final in **17**: switch expressions, text blocks, records, `instanceof` pattern matching, and sealed classes. Together they make Java far more expressive for modelling data.
+A cluster of features previewed and became final across 12–17: switch expressions in **14**, text blocks in **15**, records and `instanceof` pattern matching in **16**, and sealed classes in **17**. Together they make Java far more expressive for modelling data, and Java 17 is the LTS where the whole set is available without preview flags.
 
 Two smaller Java 14 additions pay off daily. **Helpful NullPointerExceptions** now tell you exactly which variable was null in a chained expression (`a.b().c` says whether `a` or `b()` was null), turning a guessing game into a one-line fix. **Text blocks** (final in 15) let you write multi-line strings — SQL, JSON, HTML — without escaping newlines or concatenating, which removes a real source of errors in embedded queries.
 
@@ -134,7 +134,7 @@ java --add-opens java.base/java.lang=ALL-UNNAMED \
 - Java 8: lambdas, streams, `Optional`, default methods, `java.time`, `CompletableFuture`.
 - Java 9: modules, `List.of`/`Map.of`, `takeWhile`/`dropWhile`; Java 10: `var`.
 - Java 11: HTTP client, `String` helpers, single-file source launch, ZGC.
-- Java 17: sealed classes, records and `instanceof` patterns final, strong encapsulation.
+- Java 17: sealed classes final, strong encapsulation; records and `instanceof` patterns are already final and available in this LTS.
 - Java 21: virtual threads, pattern matching for `switch`, record patterns, sequenced collections.
 - `Stream.toList()` (16) is shorter than `collect(Collectors.toList())` and returns an unmodifiable list.
 - Upgrading 8→17 mostly breaks on removed `javax` modules and illegal reflective access.
@@ -154,7 +154,7 @@ java --add-opens java.base/java.lang=ALL-UNNAMED \
 
 ## Summary
 
-Modern Java splits neatly by LTS era: 8 introduced the functional style, 11 modernised the standard library and added an HTTP client, 17 delivered the data-modelling trio of records, sealed classes and pattern matching, and 21 brought virtual threads plus pattern matching for `switch`. For interviews, know the theme of each release rather than every JEP. The genuinely senior part is the upgrade story — moving from 8 to 17 or 21 mainly breaks on removed `javax` modules and locked-down reflective access, which you bridge with explicit dependencies and `--add-opens` while upgrading the libraries that caused it.
+Modern Java splits neatly by LTS era: 8 introduced the functional style, 11 modernised the standard library and added an HTTP client, 17 made the records, sealed classes and `instanceof` pattern-matching era available on an LTS, and 21 brought virtual threads plus pattern matching for `switch`. For interviews, know the theme of each release rather than every JEP. The genuinely senior part is the upgrade story — moving from 8 to 17 or 21 mainly breaks on removed `javax` modules and locked-down reflective access, which you bridge with explicit dependencies and `--add-opens` while upgrading the libraries that caused it.
 
 ## Top Interview Questions
 
@@ -172,7 +172,7 @@ Java 8 changed the language's idiom. Lambdas and method references brought first
 
 ### Q4. Which features arrived across Java 12–17 and what problem do they solve together?
 
-Switch expressions, text blocks, records, `instanceof` pattern matching and sealed classes previewed across 12–16 and became final in 17. Together they make Java much better at modelling and processing data. Records remove boilerplate for immutable value carriers; sealed classes let you declare a closed set of subtypes; pattern matching for `instanceof` removes the redundant cast after a type check; switch expressions return values concisely; and text blocks make multi-line strings readable. Combined — a sealed interface of records, deconstructed in a switch — they give Java lightweight algebraic data types. So the theme of the 12–17 era is expressive, safe data modelling, which is exactly what the Java 21 record patterns and switch patterns build on.
+Switch expressions, text blocks, records, `instanceof` pattern matching and sealed classes matured across the releases leading to Java 17: switch expressions became final in 14, text blocks in 15, records and `instanceof` patterns in 16, and sealed classes in 17. Together they make Java much better at modelling and processing data. Records remove boilerplate for immutable value carriers; sealed classes let you declare a closed set of subtypes; pattern matching for `instanceof` removes the redundant cast after a type check; switch expressions return values concisely; and text blocks make multi-line strings readable. Combined — a sealed interface of records, deconstructed in a switch — they give Java lightweight algebraic data types. So the theme of the 12–17 era is expressive, safe data modelling, which is exactly what the Java 21 record patterns and switch patterns build on.
 
 ### Q5. What are the flagship additions in Java 21?
 

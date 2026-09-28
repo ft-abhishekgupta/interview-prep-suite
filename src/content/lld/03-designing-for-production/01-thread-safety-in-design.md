@@ -154,7 +154,7 @@ public class Inventory {
     public int getStock()   { return stock; }
     public int getVersion() { return version; }
 
-    public boolean tryReserve(int quantity, int expectedVersion) {
+    public synchronized boolean tryReserve(int quantity, int expectedVersion) {
         if (version != expectedVersion) return false; // someone else updated first — retry
         if (stock < quantity) return false;
         stock -= quantity;
@@ -164,7 +164,7 @@ public class Inventory {
 }
 ```
 
-This is the same idea as a JPA `@Version` column throwing `OptimisticLockException` on a stale write, or a database `WHERE version = :expectedVersion` update that affects zero rows when the version moved. It trades a possible retry loop for much higher throughput when conflicts are rare — the opposite bet from locking, which pays a cost on every access to avoid a conflict that might never happen.
+In this in-memory sketch the short `synchronized` write section makes the version check and update atomic; in a database this is the same idea as a JPA `@Version` column throwing `OptimisticLockException` on a stale write, or a database `WHERE version = :expectedVersion` update that affects zero rows when the version moved. It trades a possible retry loop for much higher throughput when conflicts are rare — the opposite bet from locking, which pays a cost on every access to avoid a conflict that might never happen.
 
 ## Atomic operations, thread-safe singletons and concurrent collections
 

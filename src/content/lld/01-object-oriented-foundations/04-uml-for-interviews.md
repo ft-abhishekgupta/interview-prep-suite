@@ -59,8 +59,8 @@ This table is the single most tested piece of UML trivia — mixing these up is 
 | Association | "uses" — general link, no ownership | Plain line | `A --> B` |
 | Aggregation | Has-a, part can outlive whole | Line with hollow diamond at the whole | `A o-- B` |
 | Composition | Has-a, part's lifetime bound to whole | Line with filled diamond at the whole | `A *-- B` |
-| Inheritance / Generalisation | Is-a | Line with hollow triangle arrowhead, pointing to parent | `A <|-- B` |
-| Realisation / Implementation | Implements an interface | Dashed line with hollow triangle arrowhead | `A <|.. B` |
+| Inheritance / Generalisation | Is-a | Line with hollow triangle arrowhead, pointing to parent | `A <\|-- B` |
+| Realisation / Implementation | Implements an interface | Dashed line with hollow triangle arrowhead | `A <\|.. B` |
 | Dependency | "uses temporarily" (e.g. a method parameter) | Dashed line with open arrowhead | `A ..> B` |
 
 ```mermaid

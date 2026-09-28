@@ -54,9 +54,10 @@ The standard pattern: a table with a unique constraint on message ID, checked (a
 
 ```sql
 CREATE TABLE processed_messages (
-    message_id      UNIQUEIDENTIFIER PRIMARY KEY,
+    message_id      UNIQUEIDENTIFIER NOT NULL,
+    handler_name    NVARCHAR(200) NOT NULL,
     processed_at    DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
-    handler_name    NVARCHAR(200) NOT NULL
+    CONSTRAINT pk_processed_messages PRIMARY KEY (message_id, handler_name)
 );
 ```
 
@@ -68,8 +69,8 @@ public async Task HandleAsync(OrderShippedEvent evt, Guid messageId)
     using var tx = await _db.Database.BeginTransactionAsync();
     try
     {
-        // Unique constraint on MessageId makes the second insert throw
-        _db.ProcessedMessages.Add(new ProcessedMessage { MessageId = messageId });
+        // Unique constraint on (MessageId, HandlerName) makes the second insert throw
+        _db.ProcessedMessages.Add(new ProcessedMessage { MessageId = messageId, HandlerName = "orders-shipping" });
         await _db.SaveChangesAsync(); // throws DbUpdateException on duplicate
 
         var order = await _db.Orders.FindAsync(evt.OrderId);
@@ -86,6 +87,12 @@ public async Task HandleAsync(OrderShippedEvent evt, Guid messageId)
 }
 ```
 
+## Concurrency and isolation details
+
+The dangerous implementation is a separate "check then insert" sequence: two consumer instances can both read "not processed" before either inserts, then both apply the side effect. Let the database arbitrate the race with a unique constraint and make the insert part of the same transaction as the business write. In practice that means either insert the inbox row first and treat a unique-constraint violation as "already done", or use a single atomic upsert/insert-if-not-exists statement whose result decides whether the handler proceeds.
+
+The dedup key also needs the right scope. Use `(message_id, handler_name)` or `(message_id, consumer)` rather than message ID alone when more than one logical handler may legitimately process the same event. Otherwise the first handler to see the event would prevent every other handler from doing its own work, which is correctness loss disguised as deduplication. The handler name should be stable across deploys; changing it casually is equivalent to deleting the inbox history for that consumer.
+
 ## TTL and storage growth
 
 A dedup table grows forever unless bounded. Two common strategies:
@@ -93,10 +100,10 @@ A dedup table grows forever unless bounded. Two common strategies:
 | Strategy | Trade-off |
 |---|---|
 | TTL / scheduled cleanup (delete rows older than N days) | Bounded storage; duplicates arriving after the TTL are no longer caught |
-| Bound TTL to the broker's max message TTL / max delivery window | Safe — a message can't be redelivered after it's expired from the broker anyway |
+| Bound TTL to the broker's max message TTL, DLQ retention and redrive/replay window | Safe only while every plausible duplicate or manual redrive is still covered |
 
 > [!TIP]
-> Size the dedup TTL to the broker's own message retention or max delivery count window, not longer. A message that has already expired or exceeded its max delivery count from the broker can never be redelivered again, so there is no value in keeping its dedup row past that point.
+> Size the dedup TTL to the longest window in which the same logical message can return: normal redelivery, DLQ retention and any manual redrive or replay policy. Keeping rows longer costs storage; keeping them shorter silently reopens the duplicate-processing bug during late replay.
 
 ## Idempotency for non-idempotent side effects
 
@@ -119,7 +126,7 @@ sequenceDiagram
     participant B as "Broker"
     B->>C: deliver(msg, messageId)
     C->>DB: BEGIN TX
-    C->>DB: INSERT INTO processed_messages (unique on messageId)
+    C->>DB: INSERT INTO processed_messages (unique on messageId + handler)
     alt not a duplicate
         C->>DB: apply business write
         C->>DB: COMMIT

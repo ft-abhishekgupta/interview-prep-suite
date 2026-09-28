@@ -155,7 +155,11 @@ public interface PlayStrategy {
 }
 
 public class ShuffleStrategy implements PlayStrategy {
-    private final Random random = new Random();
+    private final Random random;
+
+    public ShuffleStrategy(Random random) {
+        this.random = random;
+    }
 
     @Override
     public List<Integer> buildOrder(int size, Integer startIndex) {

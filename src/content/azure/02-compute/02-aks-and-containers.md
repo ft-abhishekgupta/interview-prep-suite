@@ -9,7 +9,7 @@ AKS questions test whether you understand the operational cost you're taking on,
 
 ## AKS architecture
 
-Azure manages the **control plane** (API server, etcd, scheduler, controller manager) for free — you don't see or patch those VMs. You manage the **node pools** — the actual VMs that run your pods. A cluster always has a **system node pool** (runs core cluster components like CoreDNS, metrics-server, and tunnel/proxy agents) and typically one or more **user node pools** for your application workloads.
+Azure manages the **control plane** (API server, etcd, scheduler, controller manager) — you don't see or patch those VMs. You manage and pay for the **node pools** — the actual VMs that run your pods — and the cluster management tier you choose controls support/SLA features. A cluster always has a **system node pool** (runs core cluster components like CoreDNS, metrics-server, and tunnel/proxy agents) and typically one or more **user node pools** for your application workloads.
 
 ```mermaid
 flowchart TD
@@ -30,7 +30,7 @@ flowchart TD
 
 | Component | Who manages it | Notes |
 |---|---|---|
-| Control plane (API server, etcd) | Azure | Free on the Standard/Free tier tiers, paid uptime SLA on the Standard tier |
+| Control plane (API server, etcd) | Azure | Free tier has no cluster management fee and no uptime SLA; Standard/Premium tiers charge for management features and include an uptime SLA/support enhancements |
 | System node pool | You (VMs), Azure (scheduling core components) | Should be isolated from app workloads via taints |
 | User node pool(s) | You | Where your workloads actually run; can scale to zero |
 
@@ -66,7 +66,7 @@ AKS has no built-in HTTP ingress — you deploy one, most commonly **NGINX Ingre
 
 ## Workload identity for pod-level Azure auth
 
-**Azure AD Workload Identity** lets individual Kubernetes pods authenticate to Azure services using a federated identity credential — no node-level managed identity shared by every pod, no secrets mounted into the pod. A pod's service account is federated with a specific Entra ID app registration/managed identity via OIDC, so only pods using that service account can get tokens for that identity.
+**Microsoft Entra Workload ID** (the AKS feature formerly called Azure AD Workload Identity) lets individual Kubernetes pods authenticate to Azure services using a federated identity credential — no node-level managed identity shared by every pod, no secrets mounted into the pod. A pod's service account is federated with a specific Entra ID app registration or user-assigned managed identity via OIDC, so only pods using that service account can get tokens for that identity.
 
 ```csharp
 // Application code is unchanged — same DefaultAzureCredential pattern as anywhere else.
@@ -153,7 +153,7 @@ The **Secrets Store CSI Driver** for Key Vault mounts secrets directly into pods
 |---|---|
 | Letting app pods schedule onto the system node pool | Taint the system pool with `CriticalAddonsOnly=true:NoSchedule` |
 | Choosing AKS without a concrete Kubernetes-specific requirement | Default to Container Apps/App Service unless you need CRDs, mesh, or cluster-level multi-tenancy |
-| Using deprecated AAD Pod Identity for pod auth | Migrate to Azure AD Workload Identity (federated OIDC) |
+| Using deprecated AAD Pod Identity for pod auth | Migrate to Microsoft Entra Workload ID (federated OIDC) |
 | Running stateful, critical workloads on spot node pools | Reserve spot for stateless/interruptible/batch workloads only |
 | Upgrading nodes without PodDisruptionBudgets set | Define PDBs on critical deployments before any upgrade/drain |
 | Using classic Azure CNI at scale without sizing the subnet | Use CNI Overlay, or size the VNet for one IP per pod |
@@ -177,7 +177,7 @@ Container Apps is built on Kubernetes under the hood but abstracts it away — y
 
 HPA scales the number of pod replicas for a deployment based on metrics like CPU or memory utilization (or custom metrics via an adapter). KEDA extends that same idea to scale based on external event sources — Service Bus queue depth, Event Hub consumer lag, Cosmos DB change feed — and uniquely supports scaling all the way down to zero replicas when there's no work, which plain HPA can't do. Cluster Autoscaler operates one layer below both of them: it watches for pods that are `Pending` because no node has enough free capacity to schedule them, and adds nodes to the relevant node pool to accommodate them (and removes nodes when they're underutilized and pods can be safely rescheduled elsewhere). They interact in sequence: KEDA/HPA decide how many pods should exist based on load or events, and if the current nodes can't fit that many pods, Cluster Autoscaler provisions more node capacity to let the scheduler actually place them.
 
-### Q4. What is Azure AD Workload Identity, and why did it replace AAD Pod Identity?
+### Q4. What is Microsoft Entra Workload ID, and why did it replace AAD Pod Identity?
 
 Workload Identity lets a Kubernetes pod authenticate to Azure services by federating its Kubernetes service account with an Entra ID app registration or managed identity via OIDC — when a pod using that specific service account requests a token, Entra ID validates the federated trust and issues a token scoped to that identity, with no node-level shared credential and no secret ever stored in the cluster. It replaced AAD Pod Identity because that older approach worked by intercepting traffic to the node's Instance Metadata Service (IMDS) and rewriting responses per-pod, which was operationally fragile (required a specific network setup per node) and had known security weaknesses — under certain conditions a pod could potentially retrieve another pod's identity token from the same node, defeating the isolation the feature was meant to provide. Workload Identity avoids all of this by using Kubernetes' native, standards-based OIDC federation instead of intercepting node-level traffic.
 

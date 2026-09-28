@@ -99,7 +99,7 @@ Migrating *into* NoSQL from a relational system is not a lift-and-shift: it requ
 |---|---|
 | Choosing NoSQL because "it scales better" without a scale problem | Justify with an actual throughput/latency/schema-agility need |
 | Modeling a document store like a normalised relational schema | Duplicate data to match access patterns instead of joining at query time |
-| Assuming "eventually consistent" means "wrong most of the time" | It converges within a bounded, usually sub-second window under normal load |
+| Assuming "eventually consistent" means "wrong most of the time" | It usually converges quickly under healthy conditions, but the system does not promise immediate visibility; design around the documented consistency model |
 | Using a graph database for a workload that's mostly point lookups | Graph databases only pay off when traversal depth/complexity is the bottleneck |
 | Forgetting that schema-on-read still needs validation | Enforce shape in application code or with a schema library at the write boundary |
 | Running one NoSQL store for every workload "for consistency of tooling" | Polyglot persistence is normal; pick the store per workload, not per project |
@@ -134,9 +134,9 @@ I'd ask what specific scale problem they're hitting — write throughput, read l
 
 A graph database earns its keep when the *queries* are fundamentally about traversal depth and relationship patterns that are expensive to express in SQL — "friends of friends who also follow X," fraud rings via shared attributes, or shortest-path/recommendation queries several hops deep. It's overkill when the dominant queries are simple lookups or one-hop joins; a normal relational join or a document store with a duplicated adjacency list handles that fine at a fraction of the operational cost. The tell in an interview is naming the traversal depth: one or two hops, use SQL joins; open-ended multi-hop pattern matching, consider a graph database.
 
-### Q7. What is polyglot persistence, and what's the operational cost of adopting it?
+### Q7. What is tunable consistency, and why is "NoSQL means eventual consistency" incomplete?
 
-Polyglot persistence is using multiple, purpose-built data stores within one system — for example, Postgres for the transactional core, Redis for sessions and caching, Elasticsearch for full-text search, and a time-series store for metrics — instead of forcing every workload through one database. The benefit is each workload gets a store actually optimised for its access pattern. The cost is operational: more systems to deploy, monitor, secure, and back up, plus a synchronisation problem — you need change-data-capture, dual writes, or an event pipeline to keep the stores consistent with each other, and that pipeline itself becomes a source of bugs and eventual-consistency windows to reason about.
+Tunable consistency means the database lets you choose the read/write quorum or consistency level per operation or per request path, rather than forcing one global behaviour. Cassandra, Dynamo-style systems and Cosmos DB all expose this idea in different forms: a write can be acknowledged after one replica, a quorum, or all replicas; a read can prefer low latency or require a stronger replica agreement. That makes "NoSQL is eventually consistent" too simplistic. Many NoSQL stores default to an availability-oriented setting because that is why they were chosen, but they often support stronger reads or quorum writes when a specific operation needs them. The trade-off is always latency and availability under partition: stronger consistency costs more coordination and can reject work that an eventual path would accept.
 
 ### Q8. Why is migrating from NoSQL back to a normalised relational schema usually harder than the other direction?
 

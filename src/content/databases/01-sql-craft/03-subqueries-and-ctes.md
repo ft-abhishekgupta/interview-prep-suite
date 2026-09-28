@@ -12,7 +12,7 @@ Subqueries and CTEs are both ways to compose a query out of smaller pieces, but 
 | Type | Returns | Where it's used | Example |
 |---|---|---|---|
 | Scalar | Single value (1 row, 1 column) | Anywhere a literal value is valid | `WHERE salary > (SELECT AVG(salary) FROM employees)` |
-| Row | Single row, multiple columns | Row comparisons | `WHERE (dept_id, city) = (SELECT dept_id, city FROM ...)` |
+| Row | Single row, multiple columns | Row comparisons in engines that support row-value constructors | `WHERE (dept_id, city) = (...)` in Postgres/MySQL; in T-SQL, rewrite as `EXISTS` with separate column predicates |
 | Table (derived table) | Multiple rows/columns | `FROM`/`JOIN` clause | `FROM (SELECT dept_id, AVG(salary) avg_sal FROM employees GROUP BY dept_id) d` |
 | Correlated | Re-evaluated per outer row | `WHERE`/`SELECT`, references outer query | `WHERE EXISTS (SELECT 1 FROM orders o WHERE o.cust_id = c.cust_id)` |
 
@@ -290,7 +290,7 @@ WITH chain AS (
 SELECT * FROM chain ORDER BY depth;
 ```
 
-The anchor starts at the target employee; the recursive member joins `employees` to the CTE on `e.employee_id = c.manager_id`, walking upward one level per iteration, stopping automatically once a row with `manager_id IS NULL` (the CEO) has no further match.
+The anchor starts at the target employee with depth 0. The recursive member then joins the base `employees` table back to the current chain row on `e.employee_id = c.manager_id`, which moves one manager upward per iteration. Recursion stops naturally when the current row has `manager_id IS NULL`, because the join finds no parent. In production I would keep a bounded `MAXRECURSION` and add cycle detection if the hierarchy is user-maintained; a bad self-reference (`manager_id = employee_id`) otherwise turns a simple org-chart query into a runaway recursive query. Ordering by depth gives the path from employee to CEO.
 
 ### Q7. What safety mechanism prevents a recursive CTE from looping forever on bad data, and how do you control it?
 
@@ -308,7 +308,7 @@ WHERE e.salary > (
 );
 ```
 
-This is a correlated scalar subquery — for each outer row, it recomputes the average salary scoped to that row's department. An equivalent, often more efficient rewrite pre-aggregates once with a CTE or derived table and joins: `WITH dept_avg AS (SELECT department_id, AVG(salary) avg_sal FROM employees GROUP BY department_id) SELECT e.* FROM employees e JOIN dept_avg d ON e.department_id = d.department_id WHERE e.salary > d.avg_sal` — this computes each department's average exactly once rather than potentially once per employee.
+This is a correlated scalar subquery — for each outer employee row, the inner query computes the average salary for that employee's department and compares the outer salary to it. It is a good, readable first answer, but on a large table it can be expensive if the optimizer cannot decorrelate it. An equivalent, often more efficient rewrite pre-aggregates once with a CTE or derived table and joins: `WITH dept_avg AS (SELECT department_id, AVG(salary) avg_sal FROM employees GROUP BY department_id) SELECT e.* FROM employees e JOIN dept_avg d ON e.department_id = d.department_id WHERE e.salary > d.avg_sal`. That version computes each department's average once, makes the join key explicit, and is usually easier to index and inspect in an execution plan. Also decide how to handle employees with `NULL` department IDs, since they will not match a grouped department average.
 
 ### Q9. What is a lateral/apply-style correlated subquery used for, and how is it different from a plain correlated subquery in WHERE?
 
@@ -325,7 +325,7 @@ FROM employees
 GROUP BY department_id;
 ```
 
-A conditional aggregate — `SUM`/`COUNT` wrapped around a `CASE WHEN` — reshapes each qualifying condition into its own column while still grouping normally, achieving the same result as `PIVOT` without engine-specific syntax. This is generally the version to write from memory in an interview since it demonstrates understanding of the underlying mechanism rather than recall of a keyword, and it ports unchanged to MySQL/Postgres where `PIVOT` isn't available.
+A conditional aggregate — `SUM`/`COUNT` wrapped around a `CASE WHEN` — reshapes each qualifying condition into its own column while still grouping normally, achieving the same result as `PIVOT` without engine-specific syntax. `SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END)` counts active rows because matching rows contribute 1 and non-matching rows contribute 0. This is generally the version to write from memory in an interview: it demonstrates the mechanism, works in SQL Server, Postgres and MySQL, and is easy to extend with more statuses by adding another expression. Native `PIVOT` can be useful, but it is more dialect-specific and less memorable under pressure.
 
 ### Q11. A query using a correlated subquery in the SELECT list is slow on a large table — how would you diagnose and fix it?
 

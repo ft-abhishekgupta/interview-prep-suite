@@ -117,7 +117,7 @@ USER app
 
 Anything not excluded from the build context is sent to the Docker daemon and is copy-able via `COPY . .` — including `.git`, local `node_modules`, secrets files, and build output.
 
-```
+```text
 .git
 bin/
 obj/

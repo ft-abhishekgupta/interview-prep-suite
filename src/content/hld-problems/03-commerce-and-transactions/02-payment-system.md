@@ -86,14 +86,14 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST /payment-intents
 { "amountInCents": 2499, "currency": "usd", "description": "Order #1234" }
 -> 201 { "paymentIntentId": "pi_1" }
 
 POST /payment-intents/{id}/transactions
 Idempotency-Key: charge_pi_1_attempt_1
-{ "type": "charge", "card": { "number": "...", "exp_month": 12, "exp_year": 2027, "cvc": "123" } }
+{ "type": "charge", "payment_method_token": "pm_tok_abc123" }
 -> 200 { "status": "succeeded", "transactionId": "txn_1" }
 
 GET /payment-intents/{id} -> PaymentIntent + Transaction[]
@@ -118,7 +118,7 @@ flowchart LR
     Recon --> Report[("PSP Settlement Report")]
 ```
 
-**Charge flow:** (1) merchant creates a payment intent, (2) merchant submits a transaction (charge) with a client-supplied idempotency key, (3) the transaction service calls out to the PSP over a secured channel, (4) on response, it durably writes the transaction result **and** the corresponding double-entry ledger rows in the same local transaction, (5) that database write is captured via change-data-capture and streamed out, driving both webhook delivery to the merchant and downstream reconciliation — decoupled from the synchronous charge path so a slow webhook never blocks the charge response. Split into its two constituent legs, the flow looks like this: the merchant-facing initiation —
+**Charge flow:** (1) merchant creates a payment intent, (2) merchant submits a transaction (charge) with a client-supplied idempotency key and a tokenized payment method, (3) the transaction service first persists a `pending` transaction keyed by that idempotency key, (4) it calls out to the PSP over a secured channel using the same reference, (5) on response, it durably writes the final transaction result **and** the corresponding double-entry ledger rows in the same local transaction, (6) that database write is captured via change-data-capture and streamed out, driving both webhook delivery to the merchant and downstream reconciliation — decoupled from the synchronous charge path so a slow webhook never blocks the charge response. If the process crashes after the PSP call but before the final write, the persisted pending transaction plus PSP reference lets a recovery worker query the PSP and finish the local ledger write without issuing a second charge. Split into its two constituent legs, the flow looks like this: the merchant-facing initiation —
 
 ![alt text](notes/HLD/Problems/PaymentSystem/image-2.png)
 
@@ -178,7 +178,7 @@ The customer's own card data gets a matching level of care: fields are collected
 
 Every transaction posts at least two ledger entries that must sum to zero — a debit and a matching credit — which makes the ledger self-verifying: if entries don't balance, something is provably wrong, independent of any application logic bug elsewhere.
 
-```
+```sql
 -- A $24.99 charge, simplified
 INSERT INTO ledger_entries (account_id, direction, amount, txn_id) VALUES
   ('customer_clearing', 'debit',  2499, 'txn_1'),
@@ -202,7 +202,7 @@ Webhooks are inherently unreliable: a merchant's endpoint can be down, slow, or 
 | Merchant endpoint down | Retry with exponential backoff over hours, not just seconds; give up after a bounded window and expose events via a pollable API as a fallback |
 | Duplicate delivery | Merchant-side and sender-side dedupe by `event_id`; webhook handlers should be idempotent by design |
 | Out-of-order delivery | Include a monotonic sequence number or timestamp so merchants can detect and reorder if it matters to them |
-| Webhook fully lost, merchant never notified | Reconciliation catches this independent of webhooks — see below |
+| Webhook fully lost, merchant never notified | Delivery log stays retryable, and the merchant can poll transaction status by ID; PSP reconciliation verifies the money movement independently |
 
 Reconciliation is the safety net that catches everything idempotency keys and webhooks miss: a scheduled job pulls the PSP's own settlement report (their record of what actually cleared) and compares it line-by-line against the internal ledger. Mismatches — a charge the PSP recorded that you have no ledger entry for, or vice versa — are flagged for automatic correction where safe, or manual review where not. A pure cron job that periodically scans for stuck "pending" transactions is a reasonable first pass but leaves customers waiting through an uncertain state; the better version has a worker watching the transaction event stream itself and proactively verifying anything that's been pending past a timeout, closing the gap between "the payment network is asynchronous" and "the customer sees a fast answer":
 
@@ -235,7 +235,7 @@ Refunds are modeled as a new `Transaction` of type `refund`, linked to the origi
 | Failure | Blast radius | Mitigation |
 |---|---|---|
 | PSP call times out, true outcome unknown | Risk of double charge on retry | Query PSP by idempotency key/reference before any retry, never retry blindly |
-| Ledger write fails after PSP confirmed success | Money moved externally with no internal record | Write transaction + ledger entries in one local transaction; use an outbox pattern so the write and the "notify downstream" step can't diverge |
+| Ledger write fails after PSP confirmed success | Money moved externally with no final local ledger row yet | Pending transaction + PSP reference are recovered by querying the PSP and posting the missing ledger entries exactly once; outbox/CDC prevents downstream notifications diverging from the local write |
 | Webhook delivery fails or merchant endpoint is down | Merchant not notified promptly | Retry with backoff; expose a pollable status API; reconciliation independently catches any missed state |
 | Ledger and PSP settlement report disagree | Financial discrepancy | Reconciliation job flags the mismatch for automatic or manual resolution before it compounds |
 

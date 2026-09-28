@@ -39,7 +39,7 @@ thread.Start();
 
 ## The thread pool: injection, hill-climbing and starvation
 
-The thread pool starts with a small number of threads and grows them on demand, but **not instantly** — .NET throttles how fast new threads are added (a technique informally called "hill climbing"), roughly one new thread per ~500ms once the minimum is exceeded, to avoid over-provisioning threads for a brief burst. This throttling is exactly why a sudden spike of blocking work can cause **thread pool starvation**: work items queue up waiting for a thread, the pool adds threads slowly, and latency spikes even though the machine has spare CPU capacity.
+The thread pool starts with a small number of threads and grows them on demand, but **not instantly** — .NET uses hill-climbing and blocking-detection heuristics to avoid over-provisioning threads for a brief burst. Newer runtimes can inject threads faster when they detect blocking, but growth is still intentionally controlled. This throttling is exactly why a sudden spike of blocking work can cause **thread pool starvation**: work items queue up waiting for a thread, the pool adds threads reactively, and latency spikes even though the machine has spare CPU capacity.
 
 ```mermaid
 flowchart TD
@@ -47,7 +47,7 @@ flowchart TD
     B -->|Yes| C["Runs immediately"]
     B -->|No| D{"Below minimum<br/>thread count?"}
     D -->|Yes| E["New thread created<br/>immediately"]
-    D -->|No| F["Queued, waits for<br/>hill-climbing to add threads<br/>(throttled, ~1 per interval)"]
+    D -->|No| F["Queued, waits for<br/>thread-pool heuristics<br/>to add threads"]
     F --> G["Latency spike under burst load"]
 ```
 
@@ -133,7 +133,7 @@ Each `Thread` reserves roughly a megabyte of stack space and requires the OS to 
 
 ### Q3. Explain thread pool starvation and why it can happen even when CPU usage looks low.
 
-Thread pool starvation happens when there isn't an available worker thread to run queued work, and the pool can't grow fast enough to keep up — the runtime deliberately throttles how quickly new threads are added (informally "hill climbing", roughly one new thread per short interval once past the minimum), to avoid over-provisioning for brief spikes. If many pool threads are simultaneously blocked — for example on `.Result`/`.Wait()` calls or synchronous I/O — new work queues up waiting for a free thread, and since the pool ramps up slowly, latency spikes even though the CPU itself may be mostly idle (the threads aren't doing CPU work, they're just blocked waiting). The fix is to remove blocking calls from the async path, not to raise `SetMinThreads`, which only masks the symptom.
+Thread pool starvation happens when there isn't an available worker thread to run queued work, and the pool can't grow fast enough to keep up — the runtime deliberately controls thread injection through hill-climbing and blocking-detection heuristics to avoid over-provisioning for brief spikes. If many pool threads are simultaneously blocked — for example on `.Result`/`.Wait()` calls or synchronous I/O — new work queues up waiting for a free thread, and latency spikes even though the CPU itself may be mostly idle (the threads aren't doing CPU work, they're just blocked waiting). The fix is to remove blocking calls from the async path, not to raise `SetMinThreads`, which only masks the symptom.
 
 ### Q4. When should you use `Task.Run`, and when is a raw dedicated `Thread` still the right choice?
 

@@ -9,7 +9,7 @@ A single-service `BEGIN ... COMMIT` gives you atomicity for free. The moment "pl
 
 ## Why ACID across services is hard
 
-Each microservice owns its own database (a hard rule — see the microservices page). A single business operation that spans three services means three separate local transactions, each of which can succeed or fail independently, with network calls in between that can also fail or time out. You cannot lock rows in another team's database, and holding a distributed lock across a multi-second workflow kills throughput.
+Each microservice owns its own database; otherwise the services are coupled at the data layer and are not independently deployable. A single business operation that spans three services means three separate local transactions, each of which can succeed or fail independently, with network calls in between that can also fail or time out. You cannot lock rows in another team's database, and holding a distributed lock across a multi-second workflow kills throughput.
 
 > [!KEY]
 > There is no free lunch: you either pay with **coordinator blocking** (2PC), or with **application-level compensation logic** (saga). Almost everyone at scale chooses the second.

@@ -5,7 +5,7 @@ difficulty: Core
 tags: [system-design, distributed-systems, fundamentals, vocabulary]
 ---
 
-Every distributed systems page in this group leans on a shared vocabulary — words like reliability, redundancy, and fault tolerance get used precisely, not interchangeably, and a design that mixes them up reads as imprecise even when the diagram is fine. This page is that vocabulary: a fast concept-to-definition table you can scan before an interview, followed by the handful of ideas — the backend request path, the storage-to-latency hierarchy, and vertical versus horizontal scaling — that don't have a dedicated page of their own elsewhere in this group.
+Every distributed systems conversation leans on a shared vocabulary — words like reliability, redundancy, and fault tolerance get used precisely, not interchangeably, and a design that mixes them up reads as imprecise even when the diagram is fine. This page is that vocabulary: a fast concept-to-definition table you can scan before an interview, followed by the backend request path, the storage-to-latency hierarchy, and vertical versus horizontal scaling ideas that tie the rest together.
 
 > [!KEY]
 > Precision with these words is itself a scoring signal. "The system should be reliable" says nothing; "the system should tolerate a single node failure without dropping a request" is a testable claim built from this vocabulary.
@@ -23,15 +23,15 @@ Every distributed systems page in this group leans on a shared vocabulary — wo
 | **SPOF (single point of failure)** | Any one component whose failure alone takes down the whole system |
 | **CI/CD** | Continuous integration and continuous deployment — shipping small changes frequently and safely |
 | **Staging environment** | A production-like environment used to validate a change before it reaches real users |
-| **CAP theorem** | On a network partition, a distributed store must choose consistency or availability — covered in full on the CAP and consistency models page |
-| **Consistency models** | The spectrum from strong to eventual consistency that decides how stale a read can be — also on the CAP and consistency models page |
-| **SLI / SLO / SLA** | The measurement, the internal target, and the contractual promise — detailed on the availability and SLOs page |
+| **CAP theorem** | During a network partition, a distributed store must choose consistency or availability; partition tolerance is assumed |
+| **Consistency models** | Rules that define how stale, ordered, or session-aware a read is allowed to be |
+| **SLI / SLO / SLA** | The measurement, the internal target, and the contractual promise |
 | **Throughput** | The amount of work a system processes per unit time — requests/second, queries/second, bytes/second |
-| **Latency** | The time a single request takes to get a response — detailed on the latency and performance page |
-| **Circuit breaker** | Stops calling a failing dependency for a cooldown period instead of retrying it into the ground — detailed on the fault tolerance and disaster recovery page |
+| **Latency** | The time a single request takes to get a response |
+| **Circuit breaker** | Stops calling a failing dependency for a cooldown period instead of retrying it into the ground |
 | **Idempotency** | Performing an operation twice has the same effect as performing it once — what makes retries safe |
 | **Graceful degradation** | Shedding non-critical functionality under load so the core function keeps working |
-| **Regionalization** | Placing servers, data, and caches close to users across geographic regions — detailed on the multi-region architecture page |
+| **Regionalization** | Placing servers, data, and caches close to users across geographic regions |
 | **Observability** | The combination of logs, metrics, and traces that lets you answer "why is this happening" from outside the process |
 
 ## What "backend" actually means
@@ -79,11 +79,11 @@ Beyond raw storage speed, each architectural layer has its own realistic capacit
 
 ## CAP, consistency, and availability in one paragraph
 
-On a network partition — the default condition you must assume in any distributed system — a store either keeps serving and risks stale data (**availability**) or stops serving to guarantee every node agrees (**consistency**). Consistency itself is a spectrum, not a binary: strong consistency guarantees every read reflects the latest write, causal consistency preserves the order of related events, read-your-writes guarantees a user sees their own updates, and eventual consistency only guarantees convergence with no bound on when. The same system can mix these per field — inventory strongly consistent, a shopping cart read-your-writes, order history eventually consistent — which is a stronger interview answer than picking one model for the whole system.
+On a network partition — a failure mode you must assume can happen in any distributed system — a store either keeps serving and risks stale data (**availability**) or stops serving to guarantee every node agrees (**consistency**). Consistency itself is a spectrum, not a binary: linearizable consistency guarantees a single object follows real-time latest-write order, causal consistency preserves the order of related events, read-your-writes guarantees a user sees their own updates, and eventual consistency only guarantees convergence with no bound on when. The same system can mix these per field — inventory strongly consistent, a shopping cart read-your-writes, order history eventually consistent — which is a stronger interview answer than picking one model for the whole system.
 
 ![alt text](notes/05-HighLevelDesign/Concepts/image.png){height=200px}
 
-Availability itself is usually expressed in nines: 99.9% uptime allows 8.76 hours of downtime a year, while 99.999% allows only 5.26 minutes. An **SLO** is the internal target you engineer toward; an **SLA** is the external, often contractual, promise built on top of it — the CAP and consistency models page and the availability and SLOs page both go much deeper on this than is useful to repeat here.
+Availability itself is usually expressed in nines: 99.9% uptime allows 8.76 hours of downtime a year, while 99.999% allows only 5.26 minutes. An **SLO** is the internal target you engineer toward; an **SLA** is the external, often contractual, promise built on top of it.
 
 ## Scaling: vertical vs horizontal
 
@@ -120,7 +120,7 @@ A circuit breaker moves through **closed** (requests flow, failures counted) →
 
 ## Regionalization, briefly
 
-Serving users across the world means placing servers and data close to them: regional servers, regional data partitioning, replication and sharding so writes don't all cross an ocean, and CDNs and caches at the edge. This is a large enough topic — active-active versus active-passive, split-brain, conflict resolution — that it has its own page in the reliability group; the summary here is that "regionalization" always means both compute placement and data placement, not compute alone.
+Serving users across the world means placing servers and data close to them: regional servers, regional data partitioning, replication and sharding so writes don't all cross an ocean, and CDNs and caches at the edge. The hard parts are active-active versus active-passive topology, split-brain prevention and conflict resolution; the summary is that "regionalization" always means both compute placement and data placement, not compute alone.
 
 ## Cheat sheet
 
@@ -147,7 +147,7 @@ Serving users across the world means placing servers and data close to them: reg
 
 ## Summary
 
-This vocabulary — reliability, redundancy, fault tolerance, SPOF, the storage-to-latency hierarchy, vertical versus horizontal scaling, and the operational concerns of validation, error handling, config, logging, and graceful shutdown — is the shared language every other page in this group assumes you already have. CAP, consistency models, availability math, and circuit breakers are deliberately kept brief here because they have full dedicated treatment elsewhere; what this page adds is the connective vocabulary and the numbers that make those deeper pages make sense on first read.
+This vocabulary — reliability, redundancy, fault tolerance, SPOF, the storage-to-latency hierarchy, vertical versus horizontal scaling, and the operational concerns of validation, error handling, config, logging, and graceful shutdown — is the shared language system design answers assume you already have. CAP, consistency models, availability math, and circuit breakers are deliberately kept brief here; the value is the connective vocabulary and the numbers that make deeper trade-off discussions precise.
 
 ## Top Interview Questions
 

@@ -61,8 +61,8 @@ The model produces a probability distribution over the next token; a decoding st
 
 | Parameter | What it does | Typical value | Use when |
 |---|---|---|---|
-| Temperature | Scales the distribution before sampling — low flattens it towards the top choice, high flattens it towards uniform | 0.0–0.3 | Deterministic tasks: extraction, classification, code generation, tool-call arguments |
-| Temperature | Higher values increase randomness | 0.7–1.0 | Creative writing, brainstorming, varied chat responses |
+| Low temperature | Sharpens the distribution around the highest-probability tokens | 0.0–0.3 | Deterministic tasks: extraction, classification, code generation, tool-call arguments |
+| High temperature | Flattens the distribution so lower-probability tokens are sampled more often | 0.7–1.0 | Creative writing, brainstorming, varied chat responses |
 | Top-p (nucleus) | Sample only from the smallest set of tokens whose cumulative probability ≥ p | 0.9–0.95 | General default; adapts vocabulary size to confidence |
 | Top-k | Sample only from the k most probable tokens | 40–100 | Blunter cutoff, less common in modern APIs |
 | Temperature = 0 | Effectively greedy decoding (always pick the top token) | — | Structured output, tool calling, reproducible tests |

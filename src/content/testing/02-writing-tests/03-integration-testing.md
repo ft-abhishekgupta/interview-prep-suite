@@ -39,6 +39,9 @@ public class OrdersApiTests : IClassFixture<WebApplicationFactory<Program>>
 
     public OrdersApiTests(WebApplicationFactory<Program> factory)
     {
+        var testConnectionString = Environment.GetEnvironmentVariable("TEST_DB_CONNECTION_STRING")
+            ?? throw new InvalidOperationException("Test database connection string is not configured.");
+
         _client = factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureServices(services =>
@@ -46,7 +49,7 @@ public class OrdersApiTests : IClassFixture<WebApplicationFactory<Program>>
                 // Replace the real DB registration with a test one
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.AddDbContext<AppDbContext>(o =>
-                    o.UseNpgsql(TestDatabaseFixture.ConnectionString));
+                    o.UseNpgsql(testConnectionString));
 
                 // Replace an external dependency with a stub
                 services.RemoveAll<IPaymentGatewayClient>();

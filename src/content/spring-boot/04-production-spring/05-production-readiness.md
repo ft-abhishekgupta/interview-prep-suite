@@ -25,7 +25,12 @@ On shutdown, deregister from service discovery so no new traffic arrives, and cl
 @PreDestroy
 void close() {
     executor.shutdown();                          // stop accepting new tasks
-    executor.awaitTermination(10, TimeUnit.SECONDS);  // let running tasks finish
+    try {
+        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) executor.shutdownNow();
+    } catch (InterruptedException e) {
+        executor.shutdownNow();
+        Thread.currentThread().interrupt();
+    }
 }
 ```
 

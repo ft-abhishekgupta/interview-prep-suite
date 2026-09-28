@@ -1,11 +1,12 @@
-# Merge Spec — folding the hand-written notes into the curriculum
+# Merge Spec — folding external note collections into the curriculum
 
-The site currently has two parallel sets of pages: an authored curriculum, and the
-author's own hand-written notes sitting in separate `NN-my-notes/` folders.
+This is the spec the merge followed, kept as the rule set for any future import. It assumes
+you have an authored curriculum page and one or more **source** notes covering the same
+ground, sitting outside `src/content/`.
 
-**Goal: one seamless notebook.** The personal notes must be folded into the curriculum
-pages so a reader sees a single, coherent page per topic — no duplication, no "my notes"
-appendix, no two versions of the same explanation.
+**Goal: one seamless notebook.** External notes must be folded into the curriculum pages so a
+reader sees a single, coherent page per topic — no duplication, no "my notes" appendix, no two
+versions of the same explanation.
 
 ---
 

@@ -77,10 +77,17 @@ await check('promoted page', '#/topic/dsa/pattern-recognition', () => ({
   prose: (document.querySelector('.prose')?.textContent ?? '').length > 2000,
 }));
 
-await check('xbox guide page', '#/topic/xbox-systems/news-feed-system', () => ({
+await check('resume case study page', '#/topic/resume/platform-and-api-projects', () => ({
   title: !!document.querySelector('.topic-title'),
   diagrams: document.querySelectorAll('.mermaid-canvas svg').length,
   questions: document.querySelectorAll('.qa-item').length,
+  prose: (document.querySelector('.prose')?.textContent ?? '').length > 1000,
+}));
+
+await check('csharp workbook page', '#/topic/dsa/arrays-strings-and-hashing-in-csharp', () => ({
+  title: !!document.querySelector('.topic-title'),
+  questions: document.querySelectorAll('.qa-item').length,
+  tables: document.querySelectorAll('.table-wrap').length,
   prose: (document.querySelector('.prose')?.textContent ?? '').length > 1000,
 }));
 
@@ -106,7 +113,7 @@ await check('sidebar hierarchy', '#/topic/dsa/binary-search', () => {
 
 await check('home lists all tracks', '#/', () => ({
   cards: document.querySelectorAll('.sec-card').length,
-  xbox: !!document.body.textContent.includes('Xbox Systems'),
+  interviewCraft: !!document.body.textContent.includes('Interview Craft'),
 }));
 
 await browser.close();

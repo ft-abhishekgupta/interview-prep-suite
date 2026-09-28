@@ -115,7 +115,7 @@ TLS 1.3's **0-RTT** mode lets a client that has previously connected resume a se
 
 ## Connection reuse and why HttpClient should be long-lived
 
-Every one of the round trips above is paid again for a brand-new connection. A pooled, reused connection pays DNS + TCP + TLS **once**, then every subsequent request on that connection skips straight to the request/response exchange. This is why creating a new `HttpClient` per request is a recurring production anti-pattern: beyond the ephemeral-port exhaustion risk covered on the networking page, it also means paying the full DNS + TCP + TLS cost on every single call instead of once per connection lifetime.
+Every one of the round trips above is paid again for a brand-new connection. A pooled, reused connection pays DNS + TCP + TLS **once**, then every subsequent request on that connection skips straight to the request/response exchange. This is why creating a new `HttpClient` per request is a recurring production anti-pattern: beyond the ephemeral-port exhaustion risk from short-lived TCP connections, it also means paying the full DNS + TCP + TLS cost on every single call instead of once per connection lifetime.
 
 ## The latency budget: cold vs warm connection
 

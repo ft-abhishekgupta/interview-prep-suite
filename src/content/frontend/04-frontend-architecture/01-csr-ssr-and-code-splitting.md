@@ -54,9 +54,9 @@ function Banner() {
 }
 ```
 
-## React Server Components (conceptual)
+## React Server Components (React 18 and 19 context)
 
-**React Server Components (RSC)** run *only* on the server and never ship their code to the client bundle at all — they can read from a database or filesystem directly, and their output (a serialized description of UI, not HTML) is streamed to the client to be merged with client components. This is a different axis from SSR: SSR is about *where the initial HTML render happens*; RSC is about *which component code ever reaches the browser in the first place*.
+**React Server Components (RSC)** require framework/bundler support; they became practical in React 18-era frameworks such as the Next.js App Router and are part of the React 19 model. They run *only* on the server and never ship their code to the client bundle at all — they can read from a database or filesystem directly, and their output (a serialized description of UI, not HTML) is streamed to the client to be merged with client components. This is a different axis from SSR: SSR is about *where the initial HTML render happens*; RSC is about *which component code ever reaches the browser in the first place*.
 
 | | Server Component | Client Component (`"use client"`) |
 |---|---|---|

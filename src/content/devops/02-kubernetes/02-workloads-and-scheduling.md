@@ -142,9 +142,9 @@ Kubernetes derives a Quality of Service class from requests/limits, which determ
 
 | QoS class | Condition | Eviction priority |
 |---|---|---|
-| `Guaranteed` | requests == limits for every resource, on every container | Evicted last |
-| `Burstable` | At least one request set, but requests ≠ limits | Evicted before Guaranteed |
-| `BestEffort` | No requests or limits set at all | Evicted first |
+| `Guaranteed` | All containers specify equal CPU and memory request/limit values | Evicted last |
+| `Burstable` | Some CPU or memory request/limit exists, but the Guaranteed rules are not met | Evicted before Guaranteed |
+| `BestEffort` | No CPU or memory requests or limits set on any container | Evicted first |
 
 > [!TIP]
 > Saying "I'd set requests equal to limits for latency-sensitive workloads to get Guaranteed QoS" is a concrete, senior-sounding answer to "how do you protect a critical workload from eviction under node pressure."

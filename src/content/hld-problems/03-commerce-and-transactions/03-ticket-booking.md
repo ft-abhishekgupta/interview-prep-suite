@@ -83,7 +83,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 GET /events/{eventId} -> Event + Venue + seat map + availability
 GET /events/search?keyword=&start=&end=&page= -> Event[]
 
@@ -117,7 +117,7 @@ flowchart LR
     Search --> Idx[("Search Index")]
 ```
 
-**On-sale flow:** (1) users arriving before/at on-sale time are placed in a virtual waiting room and issued a token with a queue position, streamed to them over SSE/WebSocket, (2) the waiting room admits users in controlled batches sized to what the booking service can actually handle, (3) an admitted user selects seats and requests a hold, which acquires a TTL-based lock on those specific seats, (4) the user completes payment within the hold's TTL, (5) on payment success the booking is confirmed and seats marked sold; on failure or TTL expiry, the hold releases and the seat map cache is updated via pub/sub so other users see it become available again.
+**On-sale flow:** (1) users arriving before/at on-sale time are placed in a virtual waiting room and issued a token with a queue position, streamed to them over SSE/WebSocket, (2) the waiting room admits users in controlled batches sized to what the booking service can actually handle, (3) an admitted user selects seats and requests a hold, which atomically marks those seats `held` with a TTL and a `hold_id`, (4) the user completes payment within the hold's TTL, (5) on payment success the booking is confirmed with a conditional update that only succeeds for that same unexpired `hold_id`; on failure or TTL expiry, the hold releases and the seat map cache is updated via pub/sub so other users see it become available again.
 
 Three simpler flows sit ahead of that contention path and are worth sketching on their own: viewing a single event's page and seat map —
 
@@ -147,6 +147,28 @@ A seat is never sold in one step. It moves through `available -> held -> confirm
 > [!KEY]
 > The TTL is what makes the system self-healing. Without it, a user who abandons checkout (closes the tab, payment page hangs) would permanently lock a seat with no automatic recovery path — the hold's expiry is what returns that seat to the pool without requiring any manual intervention.
 
+The hold and confirm transitions must be enforced by the durable seat store, not just by an in-memory lock. The exact SQL varies by database, but the shape is a conditional update:
+
+```sql
+-- hold: succeeds only if every selected seat is still available
+UPDATE seats
+SET status = 'held', hold_id = :hold_id, held_by_user_id = :user_id, hold_expires_at = :expires_at
+WHERE event_id = :event_id
+  AND seat_id IN (:seat_ids)
+  AND status = 'available';
+
+-- confirm: succeeds only for the same unexpired hold
+UPDATE seats
+SET status = 'sold', booking_id = :booking_id
+WHERE event_id = :event_id
+  AND seat_id IN (:seat_ids)
+  AND status = 'held'
+  AND hold_id = :hold_id
+  AND hold_expires_at > now();
+```
+
+The service checks that the affected-row count equals the number of requested seats; otherwise the hold or confirm fails. A row lock or serializable transaction around the selected seats gives the same guarantee in databases that prefer explicit locking.
+
 ## Deep dive: concurrency control strategy
 
 | Approach | How it works | Best for | Weakness |
@@ -156,7 +178,7 @@ A seat is never sold in one step. It moves through `available -> held -> confirm
 | Queue-based serialization | All hold requests for a given event/seat go through a single ordered queue/actor, processed one at a time | Extreme contention on the same small set of seats (front-row, popular events) | Adds a small amount of latency per request since work is serialized |
 
 > [!WARNING]
-> A distributed lock implemented with Redis (`SET seat:A12 user_id NX PX 300000`) is a form of pessimistic locking and is the common production choice — it's simple, and the TTL (`PX`) doubles as the hold's expiry mechanism, so the lock and the business-level hold timeout are the same operation rather than two systems that can drift out of sync.
+> A distributed lock implemented with Redis (`SET seat:A12 user_id NX PX 300000`) is a useful fast-path guard, but it must be backed by the conditional database transition above. Redis can expire early, be promoted from a slightly stale replica, or be lost during failover; the durable seat row is the final source of truth for whether a hold can become a sold booking.
 
 ![alt text](notes/HLD/Problems/Ticketmaster/image-6.png)
 
@@ -216,7 +238,7 @@ The same popular queries (a trending artist's name, a city's upcoming events) re
 | Seat lock store (Redis) down | No new holds can be acquired for any event | Fail closed on new holds (safer than risking double-booking); existing confirmed bookings unaffected since they're already durably stored |
 | Payment service down mid-hold | User can't complete checkout | Hold TTL auto-releases the seat if payment doesn't complete in time; user can retry once payment recovers |
 | Waiting room service down | Users can't queue for an upcoming on-sale | Booking service can apply a coarse fallback rate limit directly, degrading gracefully rather than accepting unbounded load |
-| Seat map pub/sub down | Clients see stale availability | Clients fall back to polling at a lower frequency; the underlying lock store remains the source of truth and still prevents double-booking even if the UI is stale |
+| Seat map pub/sub down | Clients see stale availability | Clients fall back to polling at a lower frequency; the underlying conditional seat state remains the source of truth and still prevents double-booking even if the UI is stale |
 
 ## Cheat sheet
 
@@ -224,7 +246,7 @@ The same popular queries (a trending artist's name, a city's upcoming events) re
 - Distributed lock with TTL (e.g. Redis `SET NX PX`) is pessimistic locking in practice, and the TTL doubles as the hold expiry.
 - For the single hottest seats, queue-based serialization beats optimistic-locking retries that all fail against each other.
 - A virtual waiting room converts an unbounded burst into a controlled, rate-limited admission stream — this is what protects the booking service, not faster locking.
-- Seat map is cached and updated via pub/sub for near-real-time accuracy, but the lock store remains the actual source of truth for correctness.
+- Seat map is cached and updated via pub/sub for near-real-time accuracy, but the durable seat row and its conditional state transitions remain the actual source of truth for correctness.
 - Isolate browse/search infrastructure from booking infrastructure so a flash sale doesn't degrade the rest of the platform.
 - Use a dedicated search engine (Elasticsearch or similar) for keyword search, with result caching for the small set of queries that dominate traffic.
 - Fail closed (deny new holds) rather than fail open on the lock store — correctness beats availability here, unlike many other systems.
@@ -247,7 +269,7 @@ A ticket booking system's central problem is contention, not storage: preventing
 
 ### Q1. How do you prevent two users from booking the same seat at the same time?
 
-A seat moves through an explicit state machine — `available -> held -> confirmed` — and the transition into `held` must be a single atomic, conditional operation, not a separate check followed by a write. Implemented with a distributed lock (e.g. Redis `SET seat:A12 user_id NX PX 300000`), the `NX` flag guarantees only the first request to attempt the hold succeeds; every subsequent request for the same seat fails immediately while it's held. This is the same category of fix as the atomic conditional decrement used to prevent overselling in inventory systems — the check and the state change must be indivisible.
+A seat moves through an explicit state machine — `available -> held -> confirmed` — and the transition into `held` must be a single atomic, conditional operation, not a separate check followed by a write. Implemented as a conditional database update (optionally fronted by Redis `SET seat:A12 user_id NX PX 300000` as a fast-path lock), only the first request can move the row from `available` to `held`, and confirmation later succeeds only for the same unexpired `hold_id`. This is the same category of fix as the atomic conditional decrement used to prevent overselling in inventory systems — the check and the state change must be indivisible.
 
 ### Q2. Why use a hold with a TTL instead of immediately marking a seat as sold when a user selects it?
 

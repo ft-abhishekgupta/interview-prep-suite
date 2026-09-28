@@ -84,7 +84,7 @@ The `Post` and `Media` records are split apart deliberately: a post's caption an
 
 ## API design
 
-```
+```http
 POST /posts -> postId
 {
   "media": {photo or video bytes},
@@ -124,7 +124,7 @@ flowchart LR
 1. The client uploads the photo/video to the post service, which streams it straight into object storage and writes a `Media` row with `status: processing`.
 2. A background job generates thumbnails (photos) or transcodes renditions (videos), then flips `status` to `ready` and invalidates any cached "not ready" response.
 3. The post service writes the `Post` row and pushes the `post_id` onto the fan-out queue.
-4. A fan-out worker pool writes the `post_id` into every follower's precomputed timeline — but only for authors under a follower-count threshold (see the deep dive below).
+4. A fan-out worker pool writes the `post_id` into every follower's precomputed timeline for authors under a follower-count threshold; posts from accounts above that threshold are pulled and merged at feed-read time.
 
 **Feed read walkthrough:**
 1. The client requests `/feed` with a cursor.

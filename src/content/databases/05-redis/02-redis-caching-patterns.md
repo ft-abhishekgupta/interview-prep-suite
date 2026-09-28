@@ -221,4 +221,4 @@ async Task<Product> GetProductAsync(int id) {
 }
 ```
 
-The key design point: both the read-from-cache and write-to-cache calls are wrapped independently, so a Redis outage degrades the request to "always hits the database," never to "the request fails."
+The key design point: both the read-from-cache and write-to-cache calls are wrapped independently, so a Redis outage degrades the request to "always hits the database," never to "the request fails." In a real service I would also emit a metric on both catch blocks and put a circuit breaker around cache calls after repeated failures; otherwise every request can spend time timing out against Redis before falling back, which protects correctness but still damages latency and can overload the database.

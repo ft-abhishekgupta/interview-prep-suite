@@ -23,7 +23,7 @@ flowchart LR
 A valid order here is `utils, core, api, worker, tests` (or `utils, core, worker, api, tests` — multiple valid orders can exist whenever two nodes have no dependency relationship between them).
 
 > [!KEY]
-> A topological order is generally **not unique**. If the interviewer asks for "a" topological order, any valid one is acceptable; if they ask for "the lexicographically smallest" one, that constrains you to a specific algorithm choice — see below.
+> A topological order is generally **not unique**. If the interviewer asks for "a" topological order, any valid one is acceptable; if they ask for "the lexicographically smallest" one, use Kahn's algorithm with a min-heap so the smallest currently available node is chosen at each step.
 
 ## Kahn's algorithm (BFS on in-degrees)
 
@@ -58,6 +58,8 @@ public int[] topoSortKahn(int n, int[][] edges) {
 ## DFS-based ordering with post-order reversal
 
 Alternative approach: run DFS from every unvisited node, and record each node **after** all of its descendants have been fully explored (post-order). Reversing that post-order list gives a valid topological order.
+
+This assumes the graph is already known to be acyclic. If cycles are possible, combine DFS ordering with the three-colour cycle check before trusting the reversed post-order result.
 
 ```java
 // O(V + E) time, O(V) space (recursion stack + visited/order arrays)

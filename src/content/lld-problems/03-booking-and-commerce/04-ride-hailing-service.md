@@ -98,19 +98,19 @@ classDiagram
     }
     class PricingStrategy {
         <<interface>>
-        +calculate(double km, double min, double surge) FareBreakdown
+        +calculate(BigDecimal km, Duration duration, BigDecimal surge) FareBreakdown
     }
     class StandardPricingStrategy {
-        -double baseFare
-        -double perKm
-        -double perMinute
-        -double minimumFare
+        -BigDecimal baseFare
+        -BigDecimal perKm
+        -BigDecimal perMinute
+        -BigDecimal minimumFare
     }
     class FareBreakdown {
-        -double baseFare
-        -double distanceFare
-        -double timeFare
-        -double total
+        -BigDecimal baseFare
+        -BigDecimal distanceFare
+        -BigDecimal timeFare
+        -BigDecimal total
     }
     DriverMatcher <|.. NearestDriverMatcher
     PricingStrategy <|.. StandardPricingStrategy
@@ -145,7 +145,7 @@ classDiagram
 
 ### 2. Fare formula behind a Strategy, keyed by ride type
 
-`PricingStrategy.calculate(distanceKm, durationMin, surge)` isolates money math entirely from ride orchestration; `RideService` just looks up the strategy for the ride's type in a `Map`. Pattern: **Strategy**. Rejected alternative: an `if/else` or `switch` on ride type inline inside `completeRide` — every new ride type or pricing tweak means editing the orchestrator, and a bug in one ride type's formula risks a merge conflict with another's.
+`PricingStrategy.calculate(distanceKm, duration, surge)` isolates money math entirely from ride orchestration; `RideService` just looks up the strategy for the ride's type in a `Map`. Pattern: **Strategy**. Rejected alternative: an `if/else` or `switch` on ride type inline inside `completeRide` — every new ride type or pricing tweak means editing the orchestrator, and a bug in one ride type's formula risks a merge conflict with another's.
 
 ### 3. Driver selection behind a Strategy, not a hardcoded scan
 
@@ -170,7 +170,7 @@ public interface DriverMatcher {
 }
 
 public interface PricingStrategy {
-    FareBreakdown calculate(double distanceKm, double durationMin, double surge);
+    FareBreakdown calculate(BigDecimal distanceKm, Duration duration, BigDecimal surgeMultiplier);
 }
 
 public enum RideStatus { REQUESTED, ASSIGNED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED }
@@ -187,9 +187,15 @@ public class Ride {
         RideStatus.CANCELLED,   EnumSet.noneOf(RideStatus.class)
     ));
 
+    private final String id = UUID.randomUUID().toString();
+    private final RideType type;
     private Driver driver;
     private RideStatus status = RideStatus.REQUESTED;
     private FareBreakdown fare;
+
+    public Ride(RideType type) {
+        this.type = type;
+    }
 
     public void assign(Driver driver) {
         transitionTo(RideStatus.ASSIGNED);
@@ -205,6 +211,8 @@ public class Ride {
         status = next;
     }
 
+    public String getId() { return id; }
+    public RideType getType() { return type; }
     public Driver getDriver() { return driver; }
     public RideStatus getStatus() { return status; }
     public FareBreakdown getFare() { return fare; }
@@ -228,17 +236,17 @@ public class RideService {
             throw new IllegalStateException("No driver available nearby");
         }
 
-        Ride ride = new Ride();
+        Ride ride = new Ride(type);
         ride.assign(driver);
         driver.setStatus(DriverStatus.ON_TRIP);
-        rides.put(riderId, ride);
+        rides.put(ride.getId(), ride);
         return ride;
     }
 
-    public FareBreakdown completeRide(String rideId, double distanceKm, double durationMin, double surge) {
+    public FareBreakdown completeRide(String rideId, BigDecimal distanceKm, Duration duration, BigDecimal surge) {
         Ride ride = rides.get(rideId);
         ride.transitionTo(RideStatus.COMPLETED);
-        FareBreakdown fare = pricing.get(RideType.UBER_GO).calculate(distanceKm, durationMin, surge);
+        FareBreakdown fare = pricing.get(ride.getType()).calculate(distanceKm, duration, surge);
         ride.setFare(fare);
         ride.getDriver().setStatus(DriverStatus.AVAILABLE);
         return fare;
@@ -268,7 +276,7 @@ A linear scan across all drivers also stops scaling well past a few thousand dri
 | Driver never arrives | A per-state timeout keyed by ride id; on expiry, auto-cancel with a specific reason and re-run matching excluding that driver | Cancellation and re-matching are already first-class, independently callable operations |
 | Millions of drivers | Replace the linear scan inside `NearestDriverMatcher` with a geohash/QuadTree index | Matching is already isolated behind `DriverMatcher` |
 | Notify rider/driver on every status change | `Ride` raises a status-changed event; push/SMS/analytics subscribe independently | Status transitions already funnel through one method (`transitionTo`) |
-| Dispatch a payload other than a person (see below) | Reuse `DriverMatcher`/lifecycle shape with a different aggregate and payload | The matching-and-lifecycle skeleton doesn't know it's moving a rider specifically |
+| Dispatch a payload other than a person (described next) | Reuse `DriverMatcher`/lifecycle shape with a different aggregate and payload | The matching-and-lifecycle skeleton doesn't know it's moving a rider specifically |
 
 ### Same dispatch machinery, different payload: a local delivery service
 
@@ -373,4 +381,4 @@ Extend `PricingStrategy` (or add a sibling `CancellationPolicy`) that inspects h
 
 ### Q12. What would you change about this design to make ride matching and fare calculation independently testable?
 
-Both are already isolated behind interfaces (`DriverMatcher`, `PricingStrategy`), so unit tests can exercise each directly: feed `NearestDriverMatcher` a hand-built list of drivers and assert which one comes back for a given pickup and radius, with no `RideService` involved; feed `StandardPricingStrategy` fixed `(distanceKm, durationMin, surge)` tuples and assert the resulting `FareBreakdown`, including boundary cases like exactly-at-minimum-fare. A smaller set of integration tests then exercises `RideService` end to end with fake strategies, to confirm the orchestration itself — not the policies — is correct.
+Both are already isolated behind interfaces (`DriverMatcher`, `PricingStrategy`), so unit tests can exercise each directly: feed `NearestDriverMatcher` a hand-built list of drivers and assert which one comes back for a given pickup and radius, with no `RideService` involved; feed `StandardPricingStrategy` fixed `(distanceKm, duration, surge)` tuples and assert the resulting `FareBreakdown`, including boundary cases like exactly-at-minimum-fare. A smaller set of integration tests then exercises `RideService` end to end with fake strategies, to confirm the orchestration itself — not the policies — is correct.

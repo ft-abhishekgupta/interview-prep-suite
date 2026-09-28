@@ -51,7 +51,7 @@ The same three letters are often mapped onto the three "cases" of an algorithm's
 
 From cheapest to most expensive:
 
-```
+```text
 O(1) < O(log n) < O(√n) < O(n) < O(n log n) < O(n²) < O(n³) < O(2ⁿ) < O(n!)
 ```
 
@@ -71,10 +71,10 @@ This is the single highest-leverage trick in a coding round. The constraint tell
 
 | Constraint on n | Target complexity | What to reach for |
 |---|---|---|
-| n ≤ 10–12 | `O(n!)` / `O(2ⁿ)` | Permutations, full backtracking |
+| n ≤ 10 | `O(n!)` | Permutations, full backtracking |
 | n ≤ 20–25 | `O(2ⁿ)` | Subsets, bitmask DP |
-| n ≤ 100 | `O(n³)` | Floyd–Warshall, interval DP |
-| n ≤ 1,000–5,000 | `O(n²)` | 2-D DP, all-pairs loops |
+| n ≤ 400–500 | `O(n³)` | Floyd–Warshall, interval DP |
+| n ≤ 5,000 | `O(n²)` | 2-D DP, all-pairs loops |
 | n ≤ 10⁵–10⁶ | `O(n log n)` or `O(n)` | Sort, heap, sliding window, hashing |
 | n ≤ 10⁹ | `O(log n)` or `O(1)` | Binary search on answer, maths |
 
@@ -175,13 +175,14 @@ Count **extra** memory you allocate, not the input.
 
 Some operations are occasionally expensive but cheap on average.
 
-| Operation | Worst case | Amortised | Why |
+| Operation | Occasional / worst cost | Common bound | Why |
 |---|---|---|---|
-| `ArrayList.add` / dynamic array push | `O(n)` (resize) | `O(1)` | Growth by ~1.5x means resizes are rare |
-| Hash map insert/lookup | `O(n)` (all collide) | `O(1)` | Good hash spreads keys |
-| Union-Find find (path compression + rank) | — | `O(α(n))` ≈ `O(1)` | Inverse Ackermann |
+| `ArrayList.add` / dynamic array push | `O(n)` (resize) | `O(1)` amortised | Growth by ~1.5x means resizes are rare |
+| Hash map insert | `O(n)` (resize or all collide) | `O(1)` average, amortised over resizes | Average depends on hash distribution; resize cost is spread over many inserts |
+| Hash map lookup | `O(n)` (all collide) | `O(1)` average, not amortised | There is no resize to smooth out — the bound depends on a well-distributed hash |
+| Union-Find find/union (path compression + rank) | — | `O(α(n))` amortised ≈ `O(1)` | Inverse Ackermann |
 
-Saying *"amortised O(1), worst case O(n) on resize"* is a strong differentiator.
+Saying *"amortised O(1), worst case O(n) on resize"* is a strong differentiator — and so is distinguishing amortised bounds (cost smoothed over a sequence) from average-case bounds (cost averaged over input/hash distributions).
 
 ## Worked example: optimise a brute force
 

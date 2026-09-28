@@ -5,7 +5,7 @@ interview-prep website. Follow this spec **exactly** — the site parses these f
 
 ## Where files go
 
-`D:\AiGeneratedNotes\interview-prep\src\content\<section>\NN-slug.md`
+`src\content\<section>\<NN-group>\<NN-slug>.md`, relative to the project root.
 
 The `NN-` prefix sets the ordering in the sidebar. Create files with the `create` tool.
 Do not modify any file outside your assigned list.
@@ -147,12 +147,16 @@ A good page is roughly:
 - Cheat sheet, common mistakes, summary
 - 8–12 questions
 
-## 6. Existing notes you may draw on
+## 6. Existing pages you may draw on
 
-There are pre-existing personal notes at `D:\AiGeneratedNotes\Content\`. If your assignment
-lists relevant files, read them and **enhance** them — fix gaps, add diagrams and tables,
-restructure for interview use. Never copy them verbatim and never copy broken image links
-(`![alt text](image.png)` — these must be removed, images do not exist on the site).
+The external note folders this curriculum was built from have been merged in and deleted;
+`src/content/` is the only source of truth. Before writing a new page, read the sibling pages
+in its group and the pages that own adjacent topics, and stay **additive** — never restate an
+explanation that already lives on another page.
+
+Images live under `public/` and are referenced relative to it, for example
+`![Process states](notes/SE/OS/image-1.png)`. The validator fails the build if the file does
+not exist, so only use paths you have verified. Never invent an image path.
 
 ## 7. Checklist before you finish each file
 

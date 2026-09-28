@@ -13,13 +13,13 @@ This page is the harder tier of the problem library. These are the questions whe
 | Burst Balloons | Dynamic Programming | Interval DP with last-burst framing | `O(n^3)` | `O(n^2)` |
 | Regular Expression Matching | Dynamic Programming | 2D DP over string and pattern prefixes | `O(m * n)` | `O(m * n)` |
 | Partition to K Equal Sum Subsets | Dynamic Programming | Bitmask DP over used elements | `O(2^n * n)` | `O(2^n)` |
-| Cheapest Flights Within K Stops | Graphs | Bellman-Ford over `k + 1` edge relaxations | `O(k * E)` | `O(V)` |
+| Cheapest Flights Within K Stops | Graphs | Bellman-Ford over `k + 1` edge relaxations | `O((k + 1) * E)` | `O(V)` |
 | Critical Connections in a Network | Graphs | Tarjan low-link bridge detection | `O(V + E)` | `O(V + E)` |
 | Reconstruct Itinerary | Graphs | Hierholzer Eulerian path traversal | `O(E log E)` | `O(E)` |
 | Partition Labels | Greedy | Last-occurrence greedy partitioning | `O(n)` | `O(1)` |
-| Letter Combinations of a Phone Number | Backtracking | Choose one letter per digit | `O(4^n)` | `O(n)` |
+| Letter Combinations of a Phone Number | Backtracking | Choose one letter per digit | `O(n * 4^n)` including output strings | `O(n)` |
 | Palindrome Partitioning | Backtracking | Backtracking with palindrome DP precompute | `O(n * 2^n)` | `O(n^2)` |
-| Meeting Rooms III | Heap | Available-room heap plus busy-room heap | `O(n log n)` | `O(n)` |
+| Meeting Rooms III | Heap | Available-room heap plus busy-room heap | `O(M log M + M log n)` for `M` meetings and `n` rooms | `O(n)` |
 | LFU Cache Design | Linked List | Hash maps plus frequency buckets of doubly linked lists | `O(1)` average per op | `O(capacity)` |
 | Median of Two Sorted Arrays | Binary Search | Partition binary search on the smaller array | `O(log(min(m, n)))` | `O(1)` |
 | Split Array Largest Sum | Binary Search | Binary search on the answer | `O(n log(sum(nums)))` | `O(1)` |
@@ -418,7 +418,7 @@ Cost-only Dijkstra loses information. A path that is slightly more expensive so 
 
 **Approach 1 — Bellman-Ford for `k + 1` rounds**
 
-**Time:** `O(k * E)` | **Space:** `O(V)`
+**Time:** `O((k + 1) * E)` | **Space:** `O(V)`
 
 After `i` full edge-relaxation rounds, you know the cheapest price using at most `i` edges. The copy of the previous round is essential so one round cannot chain newly relaxed edges together.
 
@@ -452,7 +452,7 @@ class Solution {
 
 **Approach 2 — Dijkstra on `(city, edgesUsed)`**
 
-**Time:** `O(E * k * log(E * k))` | **Space:** `O(V * k)`
+**Time:** `O(E * (k + 1) * log(V * (k + 2)))` | **Space:** `O(V * (k + 2))`
 
 This is the heap-based version of the same idea: the state is not just the city, but the city plus how many edges you spent to get there.
 
@@ -828,7 +828,7 @@ class Solution {
 
 **Approach 1 — Backtracking**
 
-**Time:** `O(4^n)` | **Space:** `O(n)`
+**Time:** `O(n * 4^n)` including output string construction | **Space:** `O(n)`
 
 Pick one character for each digit, recurse to the next digit, and undo nothing except the current position in the temporary output buffer.
 
@@ -885,7 +885,7 @@ class Solution {
 
 **Approach 1 — Backtracking**
 
-**Time:** `O(n * 2^n)` | **Space:** `O(n)`
+**Time:** `O(n^2 * 2^n)` with on-the-fly palindrome checks and substring copies | **Space:** `O(n)`
 
 At each start index, try every possible end index, keep only palindromic substrings, recurse, and then remove the last chosen substring.
 
@@ -1000,9 +1000,9 @@ The minimum-cuts variant flips this into pure DP: once you have the palindrome t
 
 **Approach 1 — Two heaps**
 
-**Time:** `O(n log n)` | **Space:** `O(n)`
+**Time:** `O(M log M + M log n)` for `M` meetings and `n` rooms | **Space:** `O(n)`
 
-Maintain one min-heap of available room numbers and one min-heap of busy rooms ordered by `(endTime, roomNumber)`. Free any rooms whose meeting ended before the next start time, then either assign directly or delay the meeting onto the earliest room that frees up.
+Maintain one min-heap of available room numbers and one min-heap of busy rooms ordered by `(endTime, roomNumber)`. Free any rooms whose meeting ended at or before the next start time, then either assign directly or delay the meeting onto the earliest room that frees up.
 
 ```java
 class Solution {
@@ -1217,7 +1217,7 @@ class Solution {
         if ((n & 1) == 1)
             return merged[n / 2];
 
-        return (merged[n / 2 - 1] + merged[n / 2]) / 2.0;
+        return (merged[n / 2 - 1] + (double) merged[n / 2]) / 2.0;
     }
 }
 ```
@@ -1254,7 +1254,7 @@ class Solution {
         if ((total & 1) == 1)
             return current;
 
-        return (previous + current) / 2.0;
+        return (previous + (double) current) / 2.0;
     }
 }
 ```
@@ -1815,7 +1815,7 @@ class Solution {
 
 **Approach 1 — Repeated merging**
 
-**Time:** `O(n^3)` | **Space:** `O(1)` conceptually
+**Time:** `O(n^3)` | **Space:** `O(n)` for the mutable fleet list
 
 Sort cars by position from nearest to farthest, compute their solo arrival times, and keep rescanning for adjacent pairs that must merge. This is educational, but far from optimal.
 
@@ -1883,7 +1883,7 @@ class Solution {
 
 **Approach 3 — Without an explicit stack**
 
-**Time:** `O(n log n)` | **Space:** `O(1)` beyond sorting the cars
+**Time:** `O(n log n)` | **Space:** `O(n)` for the paired car array
 
 The stack only ever needs its latest arrival time, so collapse it into one variable: if the current arrival time is greater than the last fleet time, it starts a new fleet; otherwise it merges into the fleet ahead.
 

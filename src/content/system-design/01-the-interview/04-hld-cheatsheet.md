@@ -5,7 +5,7 @@ difficulty: Core
 tags: [system-design, cheatsheet, interview-strategy, patterns]
 ---
 
-This is a single-sheet revision document, not a tutorial — every topic below has its own full explanation elsewhere on this site, and the point here is density: the framework script, the pattern catalogue, the toolbox tables, and the problem playbooks you want available in your head with nothing left to derive live. There is no single right answer in a system design interview; you're graded on problem navigation, solution design, technical excellence, and communication, not on matching a reference diagram.
+This is a single-sheet revision document, not a tutorial. The point is density: the framework script, the pattern catalogue, the toolbox tables, and the problem playbooks you want available in your head with nothing left to derive live. There is no single right answer in a system design interview; you're graded on problem navigation, solution design, technical excellence, and communication, not on matching a reference diagram.
 
 > [!KEY]
 > Say the generic concept first, then the product name: *"I need a partitioned, durable, ordered log — Kafka, or Event Hubs on Azure."* This reads as understanding the concept independent of any one vendor's API.
@@ -33,7 +33,7 @@ Functional requirements are verbs — ask targeted questions as if talking to a 
 | Letter | Dimension | Ask yourself |
 |---|---|---|
 | **S** | Scalability | Read or write heavy? Bursty? DAU? |
-| **C** | Consistency | CAP — pick C or A (P is a given) |
+| **C** | Consistency | CAP — during a partition choose C or A; P is assumed |
 | **A** | Availability | Uptime target? Degraded mode acceptable? |
 | **L** | Latency | p99 budget? (<100ms = "low latency") |
 | **E** | Environment | Mobile, low bandwidth, region |
@@ -43,7 +43,7 @@ Functional requirements are verbs — ask targeted questions as if talking to a 
 | **S** | Security | AuthN/AuthZ, encryption, abuse |
 
 > [!NOTE]
-> CAP forces consistency-or-availability only during a network partition; day to day, PACELC's latency-vs-consistency trade-off is the one you're actually making. The consistency spectrum, quorum reads/writes, and the nines table all have their own full page in this curriculum — here they're one line each: **strong** (linearizable) → **bounded staleness** → **session/read-your-writes** → **eventual**. The same system can mix levels per field.
+> CAP forces consistency-or-availability only during a network partition; day to day, PACELC's latency-vs-consistency trade-off is the one you're actually making. Use precise terms: **linearizable/strong** means a single object follows real-time latest-write order, **serializable** means transactions are equivalent to some serial order, **bounded staleness** has an explicit lag cap, **session/read-your-writes** is per client, and **eventual** only promises convergence. The same system can mix levels per field.
 
 ## Numbers to know
 
@@ -160,7 +160,7 @@ flowchart TD
 |---|---|---|
 | **Cache-aside** *(default)* | write DB, invalidate cache | general |
 | Write-through | cache + DB together | read-heavy, frequently updated |
-| Write-back | cache now, DB async | write-heavy (risk: loss) |
+| Write-behind (write-back) | cache now, DB async | write-heavy (risk: loss) |
 
 ### Pattern 2 — Scaling writes
 
@@ -312,8 +312,8 @@ Don't leak sequential business IDs publicly — expose an opaque id.
 
 | Concept | Meaning |
 |---|---|
-| **Quorum** | `W + R > N` ⇒ strong consistency |
-| **Consensus** | Raft/Paxos — leader + replicated log, needs a majority |
+| **Quorum** | `W + R > N` gives read/write overlap; with versions, supports latest-write/read-your-writes reads |
+| **Consensus** | Raft/Paxos — leader + replicated log; `2f + 1` nodes tolerate `f` failures |
 | **Coordination service** | Zookeeper (ZAB), etcd (Raft) — config, registry, locks |
 | **Split brain** | two leaders at once → fencing tokens + quorum promotion |
 | **Clocks** | Lamport timestamps (causal order) or vector clocks (detect concurrency) |

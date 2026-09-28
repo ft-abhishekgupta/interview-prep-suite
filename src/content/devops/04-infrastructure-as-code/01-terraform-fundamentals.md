@@ -5,14 +5,14 @@ difficulty: Core
 tags: [terraform, infrastructure-as-code, hcl, cloud]
 ---
 
-Terraform's entire value proposition rests on one idea — you declare the state you want, and a plan/apply cycle figures out the diff — so most interview questions are really testing whether you understand *how that diff is computed* and what can go wrong when it's wrong. This page covers the desired-state model, the HCL building blocks, and the plan-reading skill that separates someone who's used Terraform from someone who trusts it in production.
+Terraform's entire value proposition rests on one idea — you declare the state you want, and a plan/apply cycle figures out the diff — so most interview questions are really testing whether you understand *how that diff is computed* and what can go wrong when it's wrong. The core skills are the desired-state model, the HCL building blocks, and the plan-reading discipline that separates someone who's used Terraform from someone who trusts it in production.
 
 ## Declarative IaC and the desired-state model
 
 Terraform is **declarative**: you describe the end state you want (a VM, a subnet, three replicas of a queue), not the steps to get there. Terraform compares that desired state against the last-known **state file** and the real infrastructure, computes a diff, and executes only the operations needed to close the gap. This is fundamentally different from an imperative script that runs the same commands every time regardless of current reality.
 
 > [!KEY]
-> The state file is Terraform's memory of "what I last created." Without it (or with a stale one), Terraform cannot correctly compute a diff — this is why state management, covered on the next page, is not optional plumbing.
+> The state file is Terraform's memory of "what I last created." Without it (or with a stale one), Terraform cannot correctly compute a diff, so state management is not optional plumbing.
 
 ## Providers and provider versioning
 
@@ -143,7 +143,7 @@ flowchart LR
     S -->|"teardown"| D["terraform destroy"]
 ```
 
-`init` downloads providers and modules and sets up the backend. `plan` computes and displays the diff without touching real infrastructure. `apply` executes exactly that diff and updates state. `destroy` computes and executes the diff toward "nothing exists."
+`init` downloads providers and modules and sets up the backend. `plan` computes and displays the diff without mutating real infrastructure. `apply` executes exactly that diff and updates state. `destroy` computes and executes the diff toward "nothing exists" — useful for ephemeral environments, but too destructive to wire into routine CI for shared or production state without strong manual gates and environment scoping.
 
 ## Reading a plan diff safely
 
@@ -214,7 +214,7 @@ resource "azurerm_linux_web_app" "app" {
 - Pin provider versions with `~>` — unbounded constraints let a future major version change behaviour silently.
 - Prefer `for_each` (keyed) over `count` (positional) whenever the collection can shrink or reorder — it avoids cascading recreates.
 - Implicit dependencies (via attribute references) are preferred; use `depends_on` only when no argument expresses the real dependency.
-- `plan` never touches infrastructure; always read it before `apply`, especially any `-/+ destroy and recreate`.
+- `plan` never mutates infrastructure; always read it before `apply`, especially any `-/+ destroy and recreate`.
 - `prevent_destroy` on irreplaceable resources; `create_before_destroy` to avoid downtime on forced replacement; `ignore_changes` for legitimate external drift.
 - The state file is not optional context — it is how Terraform knows what it already created.
 
@@ -227,6 +227,7 @@ resource "azurerm_linux_web_app" "app" {
 | No version constraint on providers | Pin with `~>` so upgrades are intentional, not silent |
 | Using `depends_on` everywhere "to be safe" | Prefer implicit dependencies via attribute references; they're clearer and parallelise better |
 | No `prevent_destroy` on production data stores | Add it as a safety rail against an accidental `destroy` or forced replacement |
+| Running `terraform destroy` automatically in shared/prod CI | Reserve destroy for gated ephemeral environments; require explicit approval and environment scoping elsewhere |
 | Fighting `ignore_changes` needed for autoscaler-managed fields | Ignore only the specific field drifting, not the whole resource |
 
 ## Summary

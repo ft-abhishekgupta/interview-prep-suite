@@ -118,11 +118,11 @@ Custom type guards and assertion functions both let you teach the compiler about
 interface User {
   readonly id: string;   // cannot be reassigned after creation
   name: string;
-  nickname?: string;     // may be undefined; equivalent to `nickname: string | undefined`
+  nickname?: string;     // may be omitted; reads as string | undefined
 }
 ```
 
-`readonly` is compile-time only — it does not freeze the object at runtime the way `Object.freeze` does. `?` on a property is shorthand for a union with `undefined`, which is why `strictNullChecks` forces you to check before use.
+`readonly` is compile-time only — it does not freeze the object at runtime the way `Object.freeze` does. `?` on a property means the property may be absent; reading it gives `T | undefined`, so `strictNullChecks` forces you to check before use. With `exactOptionalPropertyTypes`, an optional property is also different from a required `T | undefined` property when assigning object literals.
 
 ## unknown vs any vs never
 
@@ -174,6 +174,21 @@ const users2: User[] = [];   // annotate empty collections and public function s
 
 Annotate: function parameters (never inferred), public function/method return types (documents the contract and catches accidental widening), and empty array/object literals. Skip annotating: local variables with an obvious initializer, and most `const` values — let inference do the work.
 
+## The satisfies operator
+
+The `satisfies` operator checks that a value is assignable to a target type **without** widening away the value's more precise inferred type. It is safer than `as` when you want the compiler to verify an object shape but still keep literal keys and values for later inference.
+
+```typescript
+const routes = {
+  home: "/",
+  admin: "/admin",
+} satisfies Record<string, `/${string}`>;
+
+type RouteName = keyof typeof routes; // "home" | "admin"
+```
+
+Unlike a type annotation, `satisfies` keeps `routes.home` as the literal `"/"` instead of widening the whole object to `Record<string, string>`. Unlike a type assertion, it does not silence errors: a value that fails the target type still fails at compile time. It is also erased at runtime like every other TypeScript type feature, so it is not input validation.
+
 ## Declaration merging
 
 Interfaces with the same name in the same scope **merge** their members automatically — a feature `type` deliberately does not have.
@@ -207,6 +222,7 @@ type StatusLiteral = "idle" | "loading" | "success" | "error"; // erased entirel
 - Type guards (`is`) narrow inside a branch; assertion functions (`asserts`) narrow everything after the call.
 - Turn on `strictNullChecks` and `noImplicitAny` first — they catch the most real bugs per line changed.
 - Annotate function signatures and empty collections; let inference handle the rest.
+- Use `satisfies` to check a value against a target type without losing its inferred literal shape; it is compile-time only.
 - Prefer string literal unions over `enum` unless you specifically need the emitted runtime object.
 
 ## Common mistakes
@@ -219,6 +235,7 @@ type StatusLiteral = "idle" | "loading" | "success" | "error"; // erased entirel
 | Reaching for `enum` by default | Prefer a union of string literals unless you need the runtime object |
 | Not enabling `strictNullChecks` | Turn it on — it is the single highest-value strict flag |
 | Annotating every local variable redundantly | Let inference handle obvious cases; annotate signatures instead |
+| Using `as` to force an object shape the compiler should verify | Use `satisfies` so shape errors are caught without widening literals |
 
 ## Summary
 

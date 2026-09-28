@@ -116,7 +116,7 @@ Running a clean process buys you control of the room, but it cannot manufacture 
 > [!TIP]
 > If you catch yourself narrating the framework fluently but going quiet the moment the interviewer asks "why does that index help here" or "what happens during a network partition," that is a content gap, not a process gap — go study that specific area rather than rehearsing the framework again.
 
-The practical implication: rehearse the process until it is automatic, but spend the majority of your actual preparation time on the content tracks above, because the framework only creates the opportunities for you to demonstrate that knowledge — it does not generate the knowledge itself.
+The practical implication: rehearse the process until it is automatic, but spend the majority of your actual preparation time on the content tracks in the table, because the framework only creates the opportunities for you to demonstrate that knowledge — it does not generate the knowledge itself.
 
 ## Red flags that sink an otherwise good answer
 

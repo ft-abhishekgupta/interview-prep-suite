@@ -32,7 +32,7 @@ The client never sees the resource owner's password. It only ever receives a **t
 | Client credentials | Machine-to-machine, no user involved | Service authenticates as itself with its own ID/secret or certificate |
 | Device code | Input-constrained devices (TVs, CLIs) | User completes login on a second device/browser; original device polls |
 | Refresh token | Any flow that issued one | Exchanged for a new access token without re-prompting the user |
-| ~~Implicit~~ (deprecated) | Was for SPAs | Returned the access token directly in the URL fragment — exposed to browser history, referrer leaks, no client authentication. Replaced by code + PKCE |
+| ~~Implicit~~ (deprecated) | Was for SPAs | Returned the access token directly in the URL fragment — exposed to browser history, browser extensions and in-page scripts, with no client authentication. Replaced by code + PKCE |
 | ~~Resource owner password credentials~~ (deprecated) | Was for "trusted" first-party apps | Client collects the raw username/password itself — defeats the entire purpose of OAuth (never expose credentials to the client) and prevents MFA/federation |
 
 > [!DANGER]
@@ -166,7 +166,7 @@ An access token is what the client presents to a resource server to authorize an
 
 ### Q5. Why were the implicit grant and the resource owner password credentials grant deprecated?
 
-The implicit grant returned the access token directly in the URL fragment after redirect, with no authorization code step and no client authentication — that token then lives in browser history, gets logged by any redirect-tracking proxy, and can leak via the `Referer` header, all with no way to verify which app actually requested it. The resource owner password credentials grant required the client application itself to collect the user's raw username and password and forward them to the authorization server — which defeats OAuth's entire premise of never exposing credentials to a third-party client, and it's incompatible with MFA, federation, or any login flow the identity provider might want to enforce later. Both were replaced by the authorization code flow with PKCE, which keeps tokens out of the browser's visible surface and never lets the client see the user's actual credential.
+The implicit grant returned the access token directly in the URL fragment after redirect, with no authorization code step and no client authentication — that token then lives in browser history and is exposed to browser extensions or any in-page script running on the redirect page, with no way to verify which app actually requested it. The resource owner password credentials grant required the client application itself to collect the user's raw username and password and forward them to the authorization server — which defeats OAuth's entire premise of never exposing credentials to a third-party client, and it's incompatible with MFA, federation, or any login flow the identity provider might want to enforce later. Both were replaced by the authorization code flow with PKCE, which keeps tokens out of the browser's visible surface and never lets the client see the user's actual credential.
 
 ### Q6. What does the `aud` claim do, and what goes wrong if a resource server doesn't check it?
 

@@ -41,6 +41,10 @@ flowchart TD
     AG --> S3
 ```
 
+The everyday shape is simpler than the capability list suggests: many client types collapse onto one public entry point, which fans path prefixes out to the service that owns each resource, each with its own datastore.
+
+![Client apps routed through an API gateway to product, cart, order and payment microservices, each with its own database](notes/05-HighLevelDesign/ApiGateway/image.png)
+
 ## Gateway vs load balancer vs service mesh
 
 These three get conflated constantly, and untangling them out loud is a strong signal.

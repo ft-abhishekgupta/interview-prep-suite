@@ -128,7 +128,11 @@ await pipeline.ExecuteAsync(async ct => await paymentClient.ChargeAsync(order, c
 // Test code: Polly's chaos extensions deliberately inject faults to verify the pipeline works
 var chaosPipeline = new ResiliencePipelineBuilder()
     .AddChaosLatency(new ChaosLatencyStrategyOptions { InjectionRate = 0.3, Latency = TimeSpan.FromSeconds(5) })
-    .AddChaosFault(new ChaosFaultStrategyOptions { InjectionRate = 0.1, FaultGenerator = _ => new TimeoutException() })
+    .AddChaosFault(new ChaosFaultStrategyOptions
+    {
+        InjectionRate = 0.1,
+        FaultGenerator = static _ => new ValueTask<Exception?>(new TimeoutException())
+    })
     .Build();
 
 // Wrap the real pipeline in the chaos pipeline during a resilience test run

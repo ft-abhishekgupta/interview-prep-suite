@@ -81,11 +81,12 @@ public async Task Run(
 
 | Plan | Scaling | Cold starts | Max execution time | VNet integration | Cost model |
 |---|---|---|---|---|---|
-| Consumption | Automatic, event-driven, 0→N instances | Yes — pays for it | 5–10 min (configurable up to 10) | No | Pay per execution + GB-s |
+| Classic Consumption | Automatic, event-driven, 0→N instances | Yes — pays for it | 5–10 min (configurable up to 10) | No | Pay per execution + GB-s |
+| Flex Consumption | Automatic, event-driven, scale-to-zero with optional always-ready instances | Lower and more tunable than classic Consumption | Longer-running workloads than classic Consumption, subject to plan limits | Yes | Pay per execution/GB-s plus any always-ready baseline |
 | Premium | Automatic, with pre-warmed instances | Minimal/avoidable | Unbounded (with caveats) | Yes | Pay for pre-warmed + burst instances |
 | Dedicated (App Service Plan) | Manual/autoscale, same as App Service | No (Always On) | Unbounded | Yes | Pay for the plan regardless of invocations |
 
-Consumption plan literally scales to zero — you pay nothing when idle, but the first request after idle time pays the cost of spinning up a new instance from scratch. Premium plan keeps a configurable number of "pre-warmed" instances always ready specifically to eliminate that, at a baseline cost even when idle.
+Classic Consumption literally scales to zero — you pay nothing when idle, but the first request after idle time pays the cost of spinning up a new instance from scratch and it lacks VNet integration. Flex Consumption is the newer serverless option for many workloads: it keeps the scale-to-zero billing model, adds VNet integration and optional always-ready instances, and reduces some cold-start pain without taking on the full Premium baseline. Premium plan keeps a configurable number of pre-warmed instances always ready and remains the choice when you need the most predictable event-driven latency and broader hosting features.
 
 ## Cold starts and how to avoid them
 
@@ -126,14 +127,15 @@ flowchart TD
 
 ## Timeouts and long-running work
 
-Consumption plan functions have a hard execution timeout (default 5 minutes, configurable to 10); anything longer must either move to Premium/Dedicated (no hard cap with Always On), or be restructured as a Durable Functions orchestration that checkpoints and can span hours or days without holding a single execution open the whole time.
+Classic Consumption plan functions have a hard execution timeout (default 5 minutes, configurable to 10); anything longer must move to a plan that supports longer executions (Flex Consumption, Premium, or Dedicated, depending on the trigger and workload) or be restructured as a Durable Functions orchestration that checkpoints and can span hours or days without holding a single execution open the whole time.
 
 ## When to choose Functions vs App Service vs containers
 
 | Requirement | Best fit |
 |---|---|
-| Simple, sporadic, event-driven workload | Functions (Consumption) |
-| Need to eliminate cold start entirely, keep event-driven model | Functions (Premium) |
+| Simple, sporadic, event-driven workload | Functions (Consumption or Flex Consumption, depending on networking/startup needs) |
+| Need VNet integration while keeping serverless scale-to-zero | Functions (Flex Consumption) |
+| Need to eliminate cold start as much as possible, keep event-driven model | Functions (Premium) |
 | Long-running API, full control over middleware/framework | App Service |
 | Need custom OS-level dependencies, non-.NET stack quirks, or portability across clouds | Containers (App Service for Containers, Container Apps, or AKS) |
 | Complex multi-step workflow with retries/fan-out spanning hours | Durable Functions |
@@ -154,7 +156,7 @@ flowchart LR
 - Scale the App Service **plan**, not the app; split unrelated apps into separate plans if scaling profiles differ.
 - Slot swap exchanges routing, not code — warm up the target slot first so users never hit a cold instance.
 - VNet Integration = outbound isolation only; Private Endpoint = inbound isolation. You usually need both.
-- Consumption plan scales to zero and pays per execution but eats cold starts; Premium keeps pre-warmed instances.
+- Classic Consumption scales to zero and pays per execution but eats cold starts and lacks VNet integration; Flex Consumption adds VNet support and optional always-ready instances; Premium keeps pre-warmed instances for the most predictable latency.
 - Orchestrator functions must be deterministic — no `DateTime.Now`, no direct I/O, no raw random — because history is replayed.
 - Durable entities are the "actor" pattern inside Functions — small stateful objects with their own operations.
 - Fan-out/fan-in lets an orchestrator dispatch N activities in parallel and await them all.
@@ -167,13 +169,13 @@ flowchart LR
 | Assuming VNet Integration makes the app private | Add a private endpoint (or access restrictions) for inbound isolation too |
 | Writing non-deterministic code inside an orchestrator function | Move I/O, randomness, and current-time reads into activity functions |
 | Running a background batch job in the same plan as a latency-sensitive API | Split into separate App Service Plans with independent scaling |
-| Expecting Consumption plan to have zero cold-start latency | Use Premium plan pre-warmed instances if cold start is unacceptable |
+| Expecting Consumption plan to have zero cold-start latency | Use Flex always-ready or Premium pre-warmed instances if cold start is unacceptable |
 | Swapping slots without warm-up/health checks configured | Enable Always On + `applicationInitialization` / custom warm-up path |
 | Treating Durable Functions as suitable for sub-second latency workflows | Use them for long-running, checkpointed workflows, not tight request/response loops |
 
 ## Summary
 
-App Service gives you a managed web host with predictable scaling via plans and near-zero-downtime deployments via slot swaps, provided you understand that VNet Integration and private endpoints solve different halves of network isolation. Azure Functions trades that always-on model for event-driven, consumption-based compute, at the cost of cold starts unless you pay for Premium's pre-warmed instances; Durable Functions extends that model to long-running, stateful workflows through deterministic orchestrators and replayable history. Choosing between Functions, App Service, and containers comes down to how event-driven the workload is, how much control you need over the runtime, and how tolerant the workload is of cold starts and execution time limits.
+App Service gives you a managed web host with predictable scaling via plans and near-zero-downtime deployments via slot swaps, provided you understand that VNet Integration and private endpoints solve different halves of network isolation. Azure Functions trades that always-on model for event-driven compute, with hosting choices ranging from classic Consumption through Flex Consumption to Premium; cold starts and VNet needs are usually what move you up that ladder. Durable Functions extends the model to long-running, stateful workflows through deterministic orchestrators and replayable history. Choosing between Functions, App Service, and containers comes down to how event-driven the workload is, how much control you need over the runtime, and how tolerant the workload is of cold starts and execution time limits.
 
 ## Top Interview Questions
 
@@ -191,7 +193,7 @@ The Durable Functions runtime persists a history of every action an orchestrator
 
 ### Q4. When would you choose Azure Functions Premium plan over Consumption, given Premium costs money even when idle?
 
-Consumption plan cold starts — the delay while a new worker is provisioned and your code initializes — can range from a few hundred milliseconds to several seconds depending on runtime and dependency size, which is unacceptable for latency-sensitive, user-facing paths (an HTTP-triggered API a mobile app calls synchronously, for instance) even if the workload is genuinely bursty and event-driven. Premium plan keeps a configurable number of pre-warmed instances always ready specifically to eliminate that gap, while still scaling out automatically under load and supporting VNet integration, which Consumption doesn't. I'd choose Premium when the trigger type demands responsiveness (HTTP, or any trigger with an SLA) or when the function needs VNet access to reach private resources; I'd keep Consumption for genuinely background, latency-tolerant processing (nightly batch triggers, non-urgent queue processing) where paying nothing at idle outweighs occasional cold-start latency.
+Classic Consumption cold starts — the delay while a new worker is provisioned and your code initializes — can range from a few hundred milliseconds to several seconds depending on runtime and dependency size, which is unacceptable for latency-sensitive, user-facing paths. Premium keeps a configurable number of pre-warmed instances ready to minimise that gap, while still scaling out automatically and supporting VNet integration. Today I would also evaluate Flex Consumption: it preserves serverless scale-to-zero, supports VNet integration, and offers always-ready instances for specific functions, so it can sit between classic Consumption and Premium on cost/latency. I choose Premium when latency predictability, trigger support, or hosting features require it; I keep Consumption/Flex for background or bursty workloads where occasional startup cost is acceptable.
 
 ### Q5. Explain fan-out/fan-in in Durable Functions with a concrete scenario.
 
@@ -215,4 +217,4 @@ An App Service Plan represents a fixed pool of compute instances shared by every
 
 ### Q10. A Function App on Consumption plan works fine in testing but shows inconsistent latency in production under real load. What would you investigate?
 
-I'd first check whether the inconsistent latency correlates with scale-out events — Consumption plan spins up new instances dynamically as load increases, and each new instance pays a cold start, so if traffic is spiky rather than steady, a meaningful fraction of requests could be hitting freshly-provisioned instances rather than warm ones, which testing at low, steady load wouldn't have revealed. I'd look at Application Insights' live metrics and dependency/duration telemetry to separate cold-start latency from actual processing latency, and check whether the function has any heavy static initialization (large DI container setup, loading big config/models at startup) that's cheap once but expensive on every cold start. If cold starts under real traffic patterns turn out to be the dominant cause, I'd move the workload to a Premium plan with a sensible minimum pre-warmed instance count, or reduce the function's dependency footprint and startup work if staying on Consumption is a hard requirement.
+I'd first check whether the inconsistent latency correlates with scale-out events — Consumption plan spins up new instances dynamically as load increases, and each new instance pays a cold start, so if traffic is spiky rather than steady, a meaningful fraction of requests could be hitting freshly-provisioned instances rather than warm ones, which testing at low, steady load wouldn't have revealed. I'd look at Application Insights' live metrics and dependency/duration telemetry to separate cold-start latency from actual processing latency, and check whether the function has any heavy static initialization (large DI container setup, loading big config/models at startup) that's cheap once but expensive on every cold start. If cold starts under real traffic patterns turn out to be the dominant cause, I'd move the workload to Flex Consumption with always-ready instances or to a Premium plan with a sensible minimum pre-warmed instance count, or reduce the function's dependency footprint and startup work if staying on classic Consumption is a hard requirement.

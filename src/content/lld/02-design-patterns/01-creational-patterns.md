@@ -23,12 +23,22 @@ classDiagram
     class CardPayment {
         +pay(BigDecimal)
     }
-    class PaymentFactory {
-        +create(String type) Payment
+    class PaymentCreator {
+        <<abstract>>
+        +checkout(BigDecimal amount)
+        #createPayment() Payment
+    }
+    class UpiPaymentCreator {
+        #createPayment() Payment
+    }
+    class CardPaymentCreator {
+        #createPayment() Payment
     }
     Payment <|.. UpiPayment
     Payment <|.. CardPayment
-    PaymentFactory --> Payment
+    PaymentCreator <|-- UpiPaymentCreator
+    PaymentCreator <|-- CardPaymentCreator
+    PaymentCreator --> Payment
 ```
 
 ```java
@@ -41,18 +51,22 @@ class UpiPayment implements Payment {
 class CardPayment implements Payment {
     public void pay(BigDecimal amount) { System.out.println("Card paid " + amount); }
 }
-class PaymentFactory {
-    public static Payment create(String type) {
-        return switch (type) {
-            case "UPI" -> new UpiPayment();
-            case "CARD" -> new CardPayment();
-            default -> throw new IllegalArgumentException("Unknown payment type: " + type);
-        };
+abstract class PaymentCreator {
+    public final void checkout(BigDecimal amount) {
+        Payment payment = createPayment();
+        payment.pay(amount);
     }
+    protected abstract Payment createPayment();
+}
+class UpiPaymentCreator extends PaymentCreator {
+    protected Payment createPayment() { return new UpiPayment(); }
+}
+class CardPaymentCreator extends PaymentCreator {
+    protected Payment createPayment() { return new CardPayment(); }
 }
 ```
 
-**Real-world use:** `Calendar.getInstance()` and `NumberFormat.getInstance()`-style factory methods, JDBC driver/connection selection based on a config-driven URL, notification channel selection. **When not to use it:** if there's only ever one concrete type and no plausible second one on the roadmap — a factory around a single implementation is needless indirection.
+**Real-world use:** framework base classes that call a protected creation hook, `Calendar.getInstance()` and `NumberFormat.getInstance()`-style factory methods in spirit, JDBC driver/connection selection based on a config-driven URL, notification channel selection. **When not to use it:** if there's only ever one concrete type and no plausible second one on the roadmap — a factory around a single implementation is needless indirection.
 
 ## Abstract Factory
 

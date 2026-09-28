@@ -104,6 +104,8 @@ stateDiagram-v2
     OutOfStock --> Idle: restock or select another product
 ```
 
+For a multi-product machine, an empty slot is usually a rejected selection that leaves the machine in `Idle`; `OutOfStock` is only a machine-wide state when no product can be sold.
+
 ## Key design decisions
 
 ### 1. State pattern instead of a switch statement plus boolean flags
@@ -153,8 +155,7 @@ public class IdleState implements VendingMachineState {
     @Override
     public void selectProduct(VendingMachine m, String productId) {
         if (!m.getInventory().isAvailable(productId)) {
-            m.setState(new OutOfStockState());
-            return;
+            throw new IllegalStateException("Product out of stock");
         }
         m.setSelectedProduct(m.getInventory().getProduct(productId));
         m.setState(new HasMoneyState());
@@ -203,23 +204,30 @@ public class HasMoneyState implements VendingMachineState {
 ```java
 public List<BigDecimal> calculateChange(BigDecimal amount) {
     List<BigDecimal> change = new ArrayList<>();
+    Map<BigDecimal, Integer> plannedCounts = new HashMap<>();
+    BigDecimal remaining = amount;
+
     List<BigDecimal> denominations = coins.keySet().stream()
         .sorted(Comparator.reverseOrder())
         .collect(Collectors.toList());
+
     for (BigDecimal denom : denominations) {
-        while (amount.compareTo(denom) >= 0 && coins.get(denom) > 0) {
+        int available = coins.get(denom);
+        while (remaining.compareTo(denom) >= 0 && plannedCounts.getOrDefault(denom, 0) < available) {
             change.add(denom);
-            amount = amount.subtract(denom);
-            coins.put(denom, coins.get(denom) - 1);
+            plannedCounts.merge(denom, 1, Integer::sum);
+            remaining = remaining.subtract(denom);
         }
     }
-    if (amount.compareTo(BigDecimal.ZERO) > 0)
+    if (remaining.compareTo(BigDecimal.ZERO) > 0)
         throw new IllegalStateException("Cannot make exact change");
+
+    plannedCounts.forEach((denom, count) -> coins.put(denom, coins.get(denom) - count));
     return change;
 }
 ```
 
-Worked example: a Coke costs 35 and the user inserts a 50 note; `calculateChange(15)` walks denominations largest-first — two 5s and a 5 (or a 10 and a 5, depending on stock) — decrementing `coins` as it goes, and only after this succeeds does `DispensingState` decrement inventory and hand back both the product and the change.
+Worked example: a Coke costs 35 and the user inserts a 50 note; `calculateChange(15)` walks denominations largest-first — two 5s and a 5 (or a 10 and a 5, depending on stock) — building a tentative change plan, committing the coin decrements only after the remainder reaches zero, and only after this succeeds does `DispensingState` decrement inventory and hand back both the product and the change.
 
 ## Concurrency and thread safety
 
@@ -240,6 +248,32 @@ Restocking is the interesting case: an admin can restock while a customer transa
 | Multi-currency support | `CashInventory` parameterized by currency, `Product`'s price becomes currency-aware | Change calculation is already isolated in one class |
 | Promo codes / loyalty discounts | A decorator/strategy applied to `Product.getPrice()` before `HasMoneyState` compares it | Price comparison is already centralized in one state transition |
 | Admin cash collection/refill | `CashInventory.collectAll()` drains the coin bank under its own lock | Cash bank is already isolated from the transaction lock, so collection never blocks a live sale |
+
+### The coffee machine variant
+
+Interviewers often ask for a **coffee machine** instead. It is the same state machine with one change that is worth naming explicitly: a vending machine's inventory is a count of finished goods, while a coffee machine's inventory is a set of **ingredients** consumed in different quantities per recipe. That single substitution is the whole problem.
+
+| Concern | Vending machine | Coffee machine |
+|---|---|---|
+| Stock unit | One `Product`, decremented by one | Several ingredients, decremented by recipe quantity |
+| Availability check | `count > 0` | Every ingredient in the recipe has enough left |
+| "Out of stock" scope | Per slot | Per beverage, derived from shared ingredients |
+| Dispense step | Drop the item | Run a sequence of timed steps, any of which can fail mid-way |
+
+```java
+public record Recipe(String name, Money price, Map<Ingredient, Integer> requirements) {}
+
+public boolean canMake(Recipe recipe) {
+    return recipe.requirements().entrySet().stream()
+        .allMatch(e -> inventory.available(e.getKey()) >= e.getValue());
+}
+```
+
+> [!WARNING]
+> Ingredients are **shared** across beverages, so availability is a derived property, not stored state. Caching "is this drink available" and forgetting to invalidate it when a different drink consumes the last of the milk is the classic bug. Recompute it, or invalidate on every ingredient decrement.
+
+> [!TIP]
+> The follow-up is almost always "what if the machine runs out of milk halfway through brewing?". The senior answer is that the dispense step must reserve all ingredients atomically before brewing starts, and that a mid-brew hardware failure needs a defined recovery state rather than silently returning to Idle with the customer's money gone.
 
 ## Cheat sheet
 

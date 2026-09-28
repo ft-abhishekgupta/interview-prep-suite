@@ -18,7 +18,7 @@ var query = from p in products
             orderby p.Name
             select p.Name;
 
-// Method syntax — what the compiler translates the above into
+// Method syntax — what the compiler translates the query expression into
 var method = products
     .Where(p => p.Price > 100)
     .OrderBy(p => p.Name)
@@ -56,7 +56,7 @@ int count = query.Count();     // enumerates once — prints "evaluating" for ev
 var list = query.ToList();     // enumerates AGAIN — prints "evaluating" for every element again
 ```
 
-If the source is a database query (`IQueryable`), each enumeration re-runs the SQL — hitting the database twice for `Count()` and `ToList()` above. The fix is to materialize once:
+If the source is a database query (`IQueryable`), each enumeration re-runs the SQL — hitting the database once for `Count()` and again for `ToList()`. The fix is to materialize once:
 
 ```csharp
 var materialized = GetExpensiveQuery().ToList();   // executes once
@@ -211,7 +211,7 @@ public static class LinqExtensions
 }
 ```
 
-`DistinctBy` shown above is a hand-rolled example for illustration — .NET 6+ actually ships a built-in `DistinctBy`, along with `MaxBy`/`MinBy`, precisely because this pattern came up often enough for Microsoft to standardize it into the BCL.
+The `DistinctBy` implementation in this example is hand-rolled for illustration — .NET 6+ actually ships a built-in `DistinctBy`, along with `MaxBy`/`MinBy`, precisely because this pattern came up often enough for Microsoft to standardize it into the BCL.
 
 ## Cheat sheet
 

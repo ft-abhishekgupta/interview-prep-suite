@@ -101,6 +101,23 @@ public class UnionFind {
 
 Given accounts with a name and a list of emails, merge accounts that share any email. Union every pair of emails within the same account (chain them: `email[0]` with `email[i]` for all `i`). At the end, group all emails by their root, then attach the owning name. This is `O(total emails · α(n))` — far better than pairwise comparison, which is `O(accounts²)`.
 
+## Mapping real keys to Union-Find indices
+
+Interview inputs are often already numbered `0..n-1`, but production-shaped problems use strings: emails, usernames, account ids, or arbitrary labels. Union-Find itself wants dense integer indices because parent arrays are faster and simpler than parent maps. The standard pattern is to maintain a `Map<String, Integer>` and assign the next id the first time a key appears.
+
+```java
+Map<String, Integer> id = new HashMap<>();
+int getId(String key) {
+    return id.computeIfAbsent(key, k -> id.size());
+}
+```
+
+After all ids are assigned, create the `UnionFind` with `id.size()`, or grow the arrays dynamically if keys arrive online and the maximum count is not known. When producing output, keep the reverse mapping or group original keys directly by `find(id.get(key))`. The algorithmic cost stays near-linear; the map adds `O(1)` average lookup per key.
+
+Do not union display names or other non-unique labels unless the problem says they identify the same entity. In Accounts Merge, the email is the identity and the name is metadata; two different people can share a name. Picking the wrong identity key makes the Union-Find implementation fast but semantically wrong.
+
+When grouping results, call `find` one final time for every id so path compression canonicalises roots before they become hash-map keys.
+
 ## Union-Find vs DFS/BFS
 
 Both answer connectivity questions, but they fit different shapes of problem.
@@ -114,7 +131,7 @@ Both answer connectivity questions, but they fit different shapes of problem.
 | Directed graph cycle detection | 3-colour DFS or topological sort | Plain Union-Find does not respect edge direction |
 
 > [!WARNING]
-> Union-Find is for **undirected** connectivity. A directed graph can have `a -> b` and `b -> a` union into one component while having no actual cycle in the traversal sense, or vice versa — use DFS with a recursion-stack colour, or Kahn's algorithm, for directed cycle detection instead.
+> Union-Find is for **undirected** connectivity. Treating directed edges as undirected creates false positives: `a -> b`, `a -> c`, `b -> c` is a DAG, but Union-Find would reject `b -> c` because `b` and `c` are already in the same undirected component. Use DFS with a recursion-stack colour, or Kahn's algorithm, for directed cycle detection instead.
 
 > [!DANGER]
 > A common bug: comparing `parent[a] == parent[b]` directly instead of `find(a) == find(b)`. Immediate parents are not roots — you must fully resolve both sides before comparing.
@@ -178,7 +195,7 @@ If you only need one connectivity check on a static graph, DFS/BFS is simpler an
 
 ### Q8. Can Union-Find detect cycles in a directed graph? Why or why not directly?
 
-Not directly, and this is a common trap. Union-Find only tracks whether two nodes are reachable from each other **ignoring direction** — it treats every edge as bidirectional. A directed graph can have `a -> b` and a separate `b -> a` that union into the same component without those two edges actually forming a directed cycle in traversal order, and conversely a genuine directed cycle might not even connect all nodes symmetrically in the union sense in subtler cases. For directed graphs, use 3-colour DFS (white/grey/black, a "grey" back-edge means a cycle) or run Kahn's topological sort — if it cannot order all nodes, a cycle exists.
+Not directly, and this is a common trap. Union-Find only tracks whether two nodes are connected **ignoring direction** — it treats every edge as bidirectional. For example, `a -> b`, `a -> c`, `b -> c` is acyclic, but after the first two edges Union-Find already puts `b` and `c` in the same undirected component and would incorrectly treat `b -> c` as a cycle. For directed graphs, use 3-colour DFS (white/grey/black, a "grey" back-edge means a cycle) or run Kahn's topological sort — if it cannot order all nodes, a cycle exists.
 
 ### Q9. How do you count connected components efficiently after processing all edges?
 

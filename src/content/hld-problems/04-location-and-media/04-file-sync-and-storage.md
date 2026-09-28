@@ -46,7 +46,7 @@ A file sync and storage platform lets a user upload a file from one device, have
 | Avg file size (blended) | 4MB assumption | given | 4MB |
 | Daily upload storage (raw) | 100M × 4MB | 100,000,000 × 4MB | ~400TB/day |
 | Daily upload storage (after ~30% compression) | 400TB × 0.7 | 400TB × 0.7 | ~280TB/day |
-| Peak upload bandwidth | 3,500 × 4MB | 3,500 × 4MB | ~14GB/s |
+| Peak upload bandwidth | 3,500 × 4MB | 3,500 × 4MB | ~14GB/s (~112Gbps) |
 
 > [!TIP]
 > Unlike a feed or a chat system, this platform isn't dominated by a huge read:write skew — it's dominated by file *size*. A 2.5:1 read:write ratio is unremarkable; the hard part is that any single request, upload or download, can carry gigabytes, which changes how every endpoint has to be built.
@@ -89,7 +89,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST /files
 Request:
 {

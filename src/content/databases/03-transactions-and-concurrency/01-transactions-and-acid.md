@@ -128,11 +128,11 @@ using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
 {
     using var conn1 = new SqlConnection(connStringA);
     await conn1.OpenAsync();
-    await conn1.ExecuteAsync("UPDATE accounts SET balance = balance - 100 WHERE account_id = 1", conn1);
+    await conn1.ExecuteAsync("UPDATE accounts SET balance = balance - 100 WHERE account_id = 1");
 
     using var conn2 = new SqlConnection(connStringB);
     await conn2.OpenAsync();
-    await conn2.ExecuteAsync("UPDATE accounts SET balance = balance + 100 WHERE account_id = 2", conn2);
+    await conn2.ExecuteAsync("UPDATE accounts SET balance = balance + 100 WHERE account_id = 2");
 
     scope.Complete(); // without this call, everything rolls back on dispose
 }

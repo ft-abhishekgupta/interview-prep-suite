@@ -26,7 +26,7 @@ Azure's messaging options are not five flavours of the same thing — they solve
 | Model | Broker (queue + pub/sub) | Partitioned log | Push event router | Simple broker queue | Partitioned log |
 | Ordering | FIFO within a session | Guaranteed per partition | Not guaranteed | Not guaranteed | Guaranteed per partition |
 | Delivery guarantee | At-least-once (dedup available) | At-least-once | At-least-once (retries + DLQ) | At-least-once | At-least-once (exactly-once with transactions) |
-| Retention | Until consumed (up to 14 days idle) | Time-based, 1–90 days, replayable | Not stored — retried up to 24h then dropped | Up to 7 days (unbounded with base64 tricks) | Time/size-based, replayable, can be indefinite |
+| Retention | Until consumed or message TTL expires (up to 14 days by default/config) | Time-based, 1–90 days, replayable | Not stored — retried up to 24h then dead-lettered or dropped | Default 7 days; configurable, including never-expire (`-1`) | Time/size-based, replayable, can be indefinite |
 | Throughput | Moderate (thousands msg/s per unit) | Very high (MB/s per partition unit) | Very high, millions of events/day | Moderate, high with sharding | Very high, scales with brokers/partitions |
 | Max message size | 256 KB (1 MB premium) | 1 MB | 1 MB (event data) | 64 KB (base64, ~48 KB effective) | Configurable, MBs |
 | Dead-lettering | Native DLQ per queue/subscription | None built-in (roll your own) | Native dead-letter destination | None built-in | None built-in (manual DLQ topic) |
@@ -35,7 +35,7 @@ Azure's messaging options are not five flavours of the same thing — they solve
 | Typical use case | Order processing, transactional workflows | Telemetry, IoT, log ingestion | Reacting to resource/blob/custom events | Simple background job queue | Cross-platform streaming, existing Kafka estate |
 
 > [!TIP]
-> If the interviewer says "guaranteed ordering and exactly-once processing for financial transactions", the answer is Service Bus sessions with duplicate detection — not Event Hubs. If they say "a million sensors per second", Event Hubs or Kafka, not Service Bus.
+> If the interviewer says "ordered, business-level exactly-once effects for financial transactions", the answer is Service Bus sessions plus duplicate detection and idempotent consumers — not Event Hubs. Service Bus is still at-least-once delivery; the exactly-once outcome comes from your deduplication/idempotency design. If they say "a million sensors per second", Event Hubs or Kafka, not Service Bus.
 
 ## Decision flowchart
 
@@ -69,7 +69,7 @@ flowchart TD
 
 State the reasoning as a short chain, not a memorised fact:
 
-1. **What is the delivery guarantee I actually need** — ordering, exactly-once, at-least-once?
+1. **What is the delivery guarantee I actually need** — ordering, at-least-once delivery, or business-level exactly-once effects via idempotency?
 2. **What is the throughput and message size** — thousands/sec vs millions/sec, KB vs MB?
 3. **Who are the consumers** — one worker pool (queue) or several independent systems (pub/sub or stream)?
 4. **Do I need replay** — can a new consumer join later and read history? Only Event Hubs/Kafka give you this.
@@ -125,7 +125,7 @@ await producer.SendAsync(batch);
 
 ## Summary
 
-The choice is rarely about raw performance — it is about which delivery guarantee, ordering model and replay capability the workload actually needs. Queues distribute discrete units of work, pub/sub and Event Grid notify multiple independent parties, and Event Hubs/Kafka give you a durable, replayable, partition-ordered stream. State the requirement first ("I need exactly-once, ordered, transactional processing" or "I need a million events a second fanned out to three readers"), then name the service — that order of reasoning is what separates a memorised answer from an engineered one.
+The choice is rarely about raw performance — it is about which delivery guarantee, ordering model and replay capability the workload actually needs. Queues distribute discrete units of work, pub/sub and Event Grid notify multiple independent parties, and Event Hubs/Kafka give you a durable, replayable, partition-ordered stream. State the requirement first ("I need ordered processing with idempotent, exactly-once business effects" or "I need a million events a second fanned out to three readers"), then name the service — that order of reasoning is what separates a memorised answer from an engineered one.
 
 ## Top Interview Questions
 
@@ -147,7 +147,7 @@ Ordering in Event Hubs is guaranteed **per partition only**, not across the whol
 
 ### Q5. What does "at-least-once" delivery mean in practice, and how do you handle it?
 
-At-least-once means a message may be delivered and processed more than once — after a crash, a network blip, or a lock renewal failure, the broker will redeliver a message it isn't sure was completed. None of Azure's brokered services except Service Bus (via `MessageId`-based duplicate detection, which only dedups within a configurable time window) give you built-in exactly-once semantics. The production answer is to make consumers **idempotent**: use the message's unique ID to check-and-set a "processed" record before acting, use idempotent database operations (upserts, conditional writes), or design side effects (like sending an email) to tolerate duplicates via a dedup table.
+At-least-once means a message may be delivered and processed more than once — after a crash, a network blip, or a lock renewal failure, the broker will redeliver a message it isn't sure was completed. Azure messaging services do not give end-to-end exactly-once business effects by themselves: Service Bus duplicate detection only deduplicates sender retries with the same `MessageId` inside a time window, and it does not prevent consumer redelivery after a lock expiry. The production answer is to make consumers **idempotent**: use the message's unique ID to check-and-set a "processed" record before acting, use idempotent database operations (upserts, conditional writes), or design side effects (like sending an email) to tolerate duplicates via a dedup table.
 
 ### Q6. Your Event Hubs consumer is falling behind during traffic spikes — what do you check and fix?
 
@@ -171,7 +171,7 @@ Storage Queues are part of a general-purpose storage account: extremely cheap (f
 
 ### Q11. How do you handle poison messages across these services?
 
-In Service Bus, a message is automatically moved to the dead-letter sub-queue after `MaxDeliveryCount` deliveries, or you can explicitly dead-letter it with a reason string for observability; consumers should then alert on DLQ depth and provide a replay tool. In Event Grid, failed deliveries are retried with exponential backoff up to a configurable window (default 24 hours, up to 30 days), after which the event goes to a configured dead-letter storage location if set, or is dropped. In Event Hubs and Storage Queues there's no built-in poison message concept: you must track a per-message retry/dequeue count yourself (Storage Queues expose `DequeueCount` natively) and manually move consistently failing items to a separate "quarantine" queue or table after a threshold.
+In Service Bus, a message is automatically moved to the dead-letter sub-queue after `MaxDeliveryCount` deliveries, or you can explicitly dead-letter it with a reason string for observability; consumers should then alert on DLQ depth and provide a replay tool. In Event Grid, failed deliveries are retried with exponential backoff for the event subscription's time-to-live window (commonly configured up to 24 hours), after which the event goes to a configured dead-letter storage location if set, or is dropped. In Event Hubs and Storage Queues there's no built-in poison message concept: you must track a per-message retry/dequeue count yourself (Storage Queues expose `DequeueCount` natively) and manually move consistently failing items to a separate "quarantine" queue or table after a threshold.
 
 ### Q12. If an interviewer asks "why not just use a database table as a queue", what's the strong answer?
 

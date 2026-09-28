@@ -215,7 +215,11 @@ Instead of a single starting node, push **all** starting nodes into the queue be
 ```java
 // e.g., "rotting oranges" — distance from ANY initially-rotten orange
 Deque<int[]> queue = new ArrayDeque<>();
-for (int[] source : initialSources) queue.offer(source);   // seed with ALL sources at once
+boolean[][] seen = new boolean[rows][cols];
+for (int[] source : initialSources) {
+    queue.offer(source);                  // seed with ALL sources at once
+    seen[source[0]][source[1]] = true;     // mark as soon as it is enqueued
+}
 int minutes = 0;
 while (!queue.isEmpty()) {
     int size = queue.size();
@@ -223,7 +227,7 @@ while (!queue.isEmpty()) {
     for (int i = 0; i < size; i++) {
         int[] cell = queue.poll();
         int r = cell[0], c = cell[1];
-        // visit neighbors, enqueue newly-reached ones, mark advanced = true if any were added
+        // visit neighbors; mark before enqueueing newly-reached cells, and set advanced = true
     }
     if (advanced) minutes++;
 }
@@ -266,7 +270,7 @@ flowchart TD
   C -- "No" --> CU["Union-Find or DFS"]
 ```
 
-The one-line version of each branch: unweighted single-source shortest path is BFS (this page); weights of only 0 or 1 upgrade to 0-1 BFS (a deque instead of a queue); non-negative weights call for Dijkstra; any negative weight needs Bellman-Ford, which as a side effect can also report a negative cycle; and all-pairs shortest paths use Floyd-Warshall. Directed cycle/ordering questions want topological sort (or the three-state DFS from earlier); undirected connectivity/cycle questions are equally well served by Union-Find as by DFS. Each of these gets its own full treatment — this page is the traversal foundation they all sit on top of.
+The one-line version of each branch: unweighted single-source shortest path is BFS; weights of only 0 or 1 upgrade to 0-1 BFS (a deque instead of a queue); non-negative weights call for Dijkstra; any negative weight needs Bellman-Ford, which can report a reachable negative cycle; and all-pairs shortest paths use Floyd-Warshall. Directed cycle/ordering questions want topological sort or three-state DFS; undirected connectivity/cycle questions are equally well served by Union-Find as by DFS.
 
 ## Cheat sheet
 

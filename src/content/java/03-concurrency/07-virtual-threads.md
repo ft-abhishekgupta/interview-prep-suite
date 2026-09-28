@@ -17,7 +17,7 @@ The industry's workaround was **asynchronous, non-blocking** code (`CompletableF
 
 A **virtual thread** is a `java.lang.Thread` scheduled by the **JVM**, not the OS. Many virtual threads run on a small pool of **carrier** platform threads (by default a `ForkJoinPool` sized to the core count):
 
-- When a virtual thread hits a **blocking** call (I/O, `sleep`, a lock), the JVM **parks the continuation on the heap** and **unmounts** it from its carrier, freeing that carrier to run another virtual thread.
+- When a virtual thread hits a Loom-aware **blocking** call (JDK I/O, `sleep`, `java.util.concurrent` locks and queues), the JVM **parks the continuation on the heap** and **unmounts** it from its carrier, freeing that carrier to run another virtual thread.
 - When the blocking operation completes, the continuation is **remounted** on some carrier and resumes.
 
 So a blocked virtual thread costs a few hundred bytes of heap, not a 1 MB OS stack, and blocking no longer wastes an OS thread. You can have **millions** of them.
@@ -142,7 +142,7 @@ try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
 
 Because there can be millions of them, virtual threads **do not appear in a normal `jstack`** dump by default — dumping millions of stacks would be unusable. Instead, take a thread dump that groups virtual threads with:
 
-```
+```bash
 jcmd <pid> Thread.dump_to_file -format=json threads.json
 ```
 

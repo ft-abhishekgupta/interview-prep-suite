@@ -39,7 +39,7 @@ public @interface SpringBootApplication {}
 
 In Boot 3, auto-configuration classes are listed in `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` — one fully-qualified class name per line. This **replaces** the old `spring.factories` mechanism used through Boot 2.x. Each class is annotated `@AutoConfiguration`, which supports `before` and `after` attributes to order relative to other auto-configurations.
 
-```
+```text
 com.example.metrics.MetricsAutoConfiguration
 com.example.cache.CacheAutoConfiguration
 ```

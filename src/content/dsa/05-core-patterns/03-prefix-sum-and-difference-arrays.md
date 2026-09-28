@@ -147,11 +147,21 @@ Plain prefix sums assume the underlying array never changes after the build. The
 |---|---|---|---|---|
 | Array never changes, many range-sum queries | Prefix sum array | `O(1)` | not supported (rebuild is `O(n)`) | `O(n)` |
 | Many point updates AND many range-sum queries | Fenwick tree (Binary Indexed Tree) | `O(log n)` | `O(log n)` | `O(n)` |
-| Range updates AND range queries, no interleaving order constraint | Segment tree with lazy propagation | `O(log n)` | `O(log n)` | `O(n)` |
+| Interleaved range updates AND range queries | Segment tree with lazy propagation | `O(log n)` | `O(log n)` | `O(n)` |
 | Many range updates, single final read of the whole array | Difference array | `O(n)` at the end | `O(1)` per update | `O(n)` |
 
 > [!DANGER]
 > Using a plain prefix-sum array when the problem says "update index i to value v, then query a range" is a classic trap — every update invalidates every suffix of the prefix array, making a naive rebuild `O(n)` per update. The moment you see interleaved point updates and range queries, reach for a **Fenwick tree** (Binary Indexed Tree) instead, which supports both in `O(log n)`.
+
+## Indexing, overflow and query shape
+
+Prefix-sum bugs are usually indexing bugs. A padded prefix array (`prefix[0] = 0`, `prefix[i + 1] = prefix[i] + nums[i]`) is often safer than an inclusive prefix because every query becomes `prefix[r + 1] - prefix[l]` with no `l == 0` branch. The same padding idea is why the 2-D version stores `rows + 1` by `cols + 1` cells: the extra top row and left column let the inclusion-exclusion formula work at the matrix boundary without special cases.
+
+Use `long` for running sums when constraints are large. Even if every individual input is an `int`, a prefix over `10^5` values can exceed `Integer.MAX_VALUE`, and a wrapped prefix sum makes every later subtraction wrong. Difference arrays have the same risk because many range updates can stack on one index.
+
+Finally, match the structure to the query shape. Prefix sums answer aggregate queries on immutable data; difference arrays handle batched updates followed by one reconstruction; hash-map prefix sums count subarrays with a target; Fenwick and segment trees handle online updates. Saying this choice out loud is often more valuable than writing the formula from memory.
+
+For subarray counting, also distinguish between storing counts and storing only membership. "Does any subarray sum to K?" can use a `HashSet` of seen prefix sums. "How many subarrays sum to K?" needs a `HashMap` from prefix sum to frequency, because multiple earlier prefixes with the same value produce multiple valid starts. That one-word difference in the prompt changes the data structure and the answer update.
 
 ## Cheat sheet
 

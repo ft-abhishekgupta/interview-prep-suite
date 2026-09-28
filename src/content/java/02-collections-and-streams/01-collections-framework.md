@@ -51,6 +51,12 @@ classDiagram
 > [!KEY]
 > `Map` is not a `Collection`. Say this out loud in an interview — candidates who claim `Map extends Collection` lose credibility instantly.
 
+The concrete classes hang off those interfaces, and the split between what is an interface and what is an implementation is exactly what an interviewer is checking when they ask you to "draw the collections hierarchy".
+
+![Java collections framework hierarchy showing interfaces and their implementing classes](notes/SE/Java/image.png)
+
+Note the legacy branch on the left: `Vector` and its subclass `Stack` are synchronised on every method and predate the framework. They still compile, but reaching for them signals unfamiliarity with modern Java — use `ArrayList` with external synchronisation, `ArrayDeque` for stack semantics, or a `java.util.concurrent` class when you genuinely need thread safety.
+
 ## ArrayList vs LinkedList
 
 `ArrayList` is a resizable `Object[]`. `LinkedList` is a doubly-linked chain of nodes. On paper `LinkedList` wins insert and delete at O(1), but that ignores how CPUs actually work.
@@ -203,7 +209,7 @@ When you genuinely need to iterate while another thread mutates, use a **fail-sa
 | Iterator style | Collections | On concurrent modification |
 |---|---|---|
 | Fail-fast | `ArrayList`, `HashMap`, `HashSet` | throws `ConcurrentModificationException` |
-| Fail-safe (weakly consistent) | `CopyOnWriteArrayList`, `ConcurrentHashMap` | iterates a snapshot, no throw |
+| Fail-safe (weakly consistent) | `CopyOnWriteArrayList`, `ConcurrentHashMap` | snapshot for copy-on-write, weakly consistent for CHM, no throw |
 
 > [!NOTE]
 > Fail-safe is not free: `CopyOnWriteArrayList` copies the whole array on every write, so it is O(n) per mutation. Use it only when reads vastly outnumber writes.

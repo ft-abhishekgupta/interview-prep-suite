@@ -3,23 +3,26 @@
 An interactive study site covering the full curriculum for senior software engineering
 interviews — DSA, system design, LLD, Java & the JVM, Spring Boot, C#/.NET, Azure, databases,
 messaging, AI engineering, front-end, security, DevOps, observability, testing, fundamentals,
-behavioural and résumé prep.
+language breadth, behavioural, résumé and the interview loop itself.
 
 Code samples in the DSA, LLD and design tracks are written in **Java 17**. The C#/.NET and
-ASP.NET Core tracks are kept as their own sections for candidates interviewing on that stack.
+ASP.NET Core tracks are kept as their own sections for candidates interviewing on that stack,
+and `dsa/09-csharp-workbook/` solves the same coding patterns in C# for .NET candidates.
 
-The author's own hand-written notes have been **merged into the curriculum**, not bolted on
-beside it: their explanations, worked examples, code and hand-drawn diagrams live inside the
-relevant topic page, deduplicated against the authored material. There is one page per topic.
+Every earlier collection of notes — hand-written notebooks, generated markdown sets, problem
+banks and outline skeletons — has been **merged into this curriculum**, not bolted on beside
+it. Their explanations, worked examples, code and hand-drawn diagrams live inside the relevant
+topic page, deduplicated against the authored material. There is one page per topic, and this
+project is now the single source of truth.
 
 | | |
 |---|---|
-| Topic pages | **353** across 22 tracks and 93 groups |
-| Interview questions | **4,060** with full answers |
-| Mermaid diagrams | **600** |
-| Original hand-drawn diagrams | **384** |
-| Comparison tables | **1,673** |
-| Reading time | ~87 hours |
+| Topic pages | **385** across 23 tracks and 103 groups |
+| Interview questions | **4,325** with full answers |
+| Mermaid diagrams | **628** |
+| Original hand-drawn diagrams | **402** |
+| Comparison tables | **1,969** |
+| Reading time | ~94 hours |
 
 Run `npm run stats` for the per-track breakdown.
 
@@ -36,8 +39,10 @@ dsa/
   04-graphs/                 Traversal, Union-Find, Topo Sort, Shortest Path, MST
   05-core-patterns/          Two Pointers, Sliding Window, Binary Search, and friends
   06-dynamic-programming/    Foundations, Patterns
-  07-interview-craft/        Playbook, Pattern Recognition, Advanced Patterns, Java reference
+  07-interview-craft/        Playbook, Pattern Recognition, Advanced Patterns,
+                             Java and C# language references
   08-problem-library/        Must-solve list, worked problems, contest write-ups
+  09-csharp-workbook/        The same patterns solved in C#, nine worked problem sets
 ```
 
 The folder name sets the group order and title — no configuration needed. The Java and
@@ -165,9 +170,21 @@ Section metadata (title, blurb, icon, colour, priority, grouping) lives in
 npm run validate          # report spec violations
 npm run validate:fix      # auto-fix question numbering, level-1 headings, stray images
 npm run check:mermaid     # parse every diagram with the real mermaid parser
-npm run check             # typecheck + validate + mermaid, all in one
+npm run audit             # deep audit: cross-page duplication, truncation, table and fence integrity
+npm run syllabus          # check the curriculum against the senior-interview topic pool
+npm run check             # typecheck + validate + mermaid + audit + syllabus, all in one
 npm run stats             # per-track page/question/diagram counts
 ```
+
+`npm run audit` is the second-level linter. Where `validate` checks a page against the authoring
+spec, `audit` compares pages **against each other** and reads inside the prose — it catches
+repeated interview questions across pages, near-duplicate explanations, code fences in the wrong
+language for a track, unescaped `|` inside table cells, answers too thin to say out loud,
+placeholder text and cross-references that break the one-page-per-topic rule.
+
+`npm run syllabus` walks a fixed pool of ~160 topics that senior loops actually draw from and
+reports each as covered by a page, covered by a section, mentioned, weak or missing. It exits
+non-zero on a missing topic, so a curriculum gap fails the build rather than going unnoticed.
 
 ### Browser smoke test
 
@@ -177,48 +194,62 @@ every mermaid diagram produces an SVG, and the console is clean.
 ```bash
 npm run build && npm run preview     # in one terminal
 npm run smoke                        # in another - one page per track
-npm run smoke:all                    # every one of the 353 pages
+npm run smoke:all                    # every one of the 385 pages
 npm run smoke:routes                 # home, sections, roadmap, practice, revise, progress
 npm run smoke:theme                  # diagrams survive and recolour on theme toggle
 ```
 
-## How the personal notes were merged in
+## How the earlier note collections were merged in
 
-The original hand-written notes live outside this project at `D:\AiGeneratedNotes\Content`.
-They were brought in as a one-time migration and then folded into the curriculum:
+This project began as an authored curriculum sitting alongside nine separate folders of
+notes — hand-written notebooks, several generated markdown sets, HLD/LLD/coding problem
+banks, and outline-only skeletons. All of them have now been folded in and the originals are
+gone. `MERGE-SPEC.md` records the rules the merge followed: one page per topic, deduplicate
+hard, keep every hand-drawn diagram, no "from my notes" attribution.
 
-| Script | What it did |
+What the merge produced, beyond enriching existing pages:
+
+| Added | Where |
 |---|---|
-| `tools/import-notes.mjs` | pulled in 83 markdown notes and copied their 383 images to `public/notes/` |
-| `tools/import-xbox-guide.mjs` | converted the Xbox Services Guide HTML into the Xbox Systems track |
-| `tools/finalise-merge.mjs` | removed the temporary `NN-my-notes` groups once their content was merged |
-| `tools/renumber.mjs` | tidied the `NN-` prefixes after pages moved between groups |
+| Résumé deep dive — the bullet drill and nine project case studies | `resume/` |
+| The interview loop — round-by-round, machine coding, revision plans, one-pagers | `interview-process/` |
+| Language breadth — Python, C++, Node.js | `languages/` |
+| C# coding workbook — nine worked problem sets | `dsa/09-csharp-workbook/` |
+| Application architecture — clean, hexagonal, DDD, persistence patterns | `lld/05-application-architecture/` |
+| Test automation — manual QA, Selenium, Playwright, API automation, .NET testing | `testing/` |
+| HTML, CSS, browser rendering and Core Web Vitals | `frontend/05-web-platform/` |
+| Database operations — query triage, backup and recovery, multi-tenancy | `databases/06-operating-in-production/` |
+| Azure cost, governance, API Management and monitoring | `azure/06-operations-and-cost/` |
+| OS essentials, Linux and the command line, SDLC and agile delivery | `fundamentals/` |
+| Caching in ASP.NET Core | `backend/03-aspnet-core/` |
+| Build and dependency management | `devops/03-delivery/` |
+| Communication and design docs, levelling and offers | `behavioural/03-the-conversation/` |
 
-`MERGE-SPEC.md` records the rules the merge followed: one page per topic, deduplicate hard,
-keep every hand-drawn diagram, no "from my notes" attribution.
+Hand-drawn diagrams were deduplicated by content rather than filename — several folders held
+re-encoded copies of the same image — so `public/notes/` holds 402 distinct diagrams, every
+one of them referenced by a page.
 
-The two import scripts now refuse to run without `--force`, because re-running them would
-recreate the duplicate groups and overwrite the merged pages. If you update a note in
-`D:\AiGeneratedNotes\Content` and want it reflected, edit the corresponding page under
-`src/content/` directly — that is now the source of truth.
+`tools/finalise-merge.mjs` and `tools/renumber.mjs` remain as the housekeeping scripts used
+during the merge. The two one-time import scripts have been removed along with the external
+folders they read from; `src/content/` is now the only source of truth.
 
 ## Project layout
 
 ```
 plugins/content-manifest.ts   Vite plugin: scans src/content, emits the nav/search manifest
-public/notes/                 Images copied from your original notes
+public/notes/                 Hand-drawn diagrams carried over from the original notes
 src/content/                  All markdown: <section>/<NN-group>/<NN-page>.md
 src/lib/                      Content loading, sections registry, progress, theme
 src/components/               Header, sidebar, command palette, markdown renderer, mermaid
 src/pages/                    Home, section, topic, roadmap, practice, revise, progress
 src/styles/                   Design tokens, layout, prose, page styles
 tools/validate-content.mjs    Content linter
+tools/audit-content.mjs       Cross-page audit: duplication, fences, tables, thin answers
+tools/check-syllabus.mjs      Curriculum coverage against the senior-interview topic pool
 tools/check-mermaid.mjs       Parses every diagram with the mermaid parser
 tools/regroup.mjs             Applies the sub-group layout to curriculum pages
 tools/renumber.mjs            Normalises the NN- prefixes inside every group
 tools/finalise-merge.mjs      Removed the temporary my-notes groups after merging
-tools/import-notes.mjs        One-time import of the markdown notes and their images
-tools/import-xbox-guide.mjs   One-time conversion of the Xbox Services Guide HTML
 tools/smoke.mjs               Headless-Chrome render check for topic pages
 tools/check-routes.mjs        Headless-Chrome check for the other routes
 tools/check-hierarchy.mjs     Headless-Chrome check for groups and note images

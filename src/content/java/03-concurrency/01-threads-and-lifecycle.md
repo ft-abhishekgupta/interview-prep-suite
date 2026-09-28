@@ -9,7 +9,7 @@ A Java platform thread is a thin wrapper over an operating-system thread. Unders
 
 ## Platform Threads and Their Cost
 
-Every `java.lang.Thread` you create before Java 21 is a **platform thread** — it maps **1:1 to an OS thread** and is scheduled by the operating system, not the JVM. That mapping is not free:
+Every ordinary `new Thread(...)` you create is a **platform thread** — before Java 21 it was the only built-in thread kind, and it maps **1:1 to an OS thread** scheduled by the operating system. That mapping is not free:
 
 - Each thread reserves roughly **1 MB of stack** (`-Xss` default, often 512 KB–1 MB). 10,000 threads is gigabytes of committed stack before any work runs.
 - Creating one costs **a few microseconds** and a system call; it is not something to do per request in a hot path.

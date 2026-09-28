@@ -61,7 +61,7 @@ The standard pattern: use vector (or hybrid) search to cheaply narrow millions o
 
 ## Metadata filtering
 
-Combining semantic/hybrid search with structured filters (date range, category, tenant, permission level) narrows the candidate pool to what's actually eligible before or after ranking. See the embeddings page for the pre-filter vs post-filter trade-off — the same consideration applies here: a narrow filter applied after ranking risks starving the result set.
+Combining semantic/hybrid search with structured filters (date range, category, tenant, permission level) narrows the candidate pool to what's actually eligible before or after ranking. The same pre-filter versus post-filter trade-off applies: a narrow filter applied after ranking risks starving the result set.
 
 ## Recall@k vs precision@k
 

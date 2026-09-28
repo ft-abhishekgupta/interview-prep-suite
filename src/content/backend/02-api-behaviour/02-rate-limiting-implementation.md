@@ -93,7 +93,7 @@ bool allowed = result == 1;
 | Per-IP | Anonymous/public endpoints, login attempts | NATs and corporate proxies share one IP across many real users |
 | Per-user/API key | Authenticated APIs, per-account fairness | Requires authentication to have already happened |
 | Per-tenant | Multi-tenant SaaS, isolate noisy-neighbour tenants | Needs tenant resolution before the limiter runs |
-| Per-endpoint (combined with above) | Expensive endpoints (search, export) need tighter limits than cheap ones (`GET /health`) | More keys to track and tune |
+| Per-endpoint plus caller key | Expensive endpoints (search, export) need tighter limits than cheap ones (`GET /health`) | More keys to track and tune |
 
 > [!TIP]
 > Layer keys rather than picking just one: a login endpoint often needs *both* a per-IP limit (stop credential-stuffing from one source) and a per-account limit (stop one compromised account from being hammered from many IPs).
@@ -139,12 +139,15 @@ public class TokenBucketRateLimiter
             local last = tonumber(redis.call('HGET', KEYS[1], 'ts') or ARGV[3])
             local elapsed = (tonumber(ARGV[3]) - last) / 1000.0
             tokens = math.min(tonumber(ARGV[1]), tokens + elapsed * tonumber(ARGV[2]))
+            local ttl = math.ceil((tonumber(ARGV[1]) / tonumber(ARGV[2])) * 2)
             if tokens < 1 then
                 redis.call('HSET', KEYS[1], 'tokens', tokens, 'ts', ARGV[3])
+                redis.call('EXPIRE', KEYS[1], ttl)
                 return 0
             end
             tokens = tokens - 1
             redis.call('HSET', KEYS[1], 'tokens', tokens, 'ts', ARGV[3])
+            redis.call('EXPIRE', KEYS[1], ttl)
             return 1";
         var result = (int)await _redis.ScriptEvaluateAsync(script,
             new RedisKey[] { $"bucket:{key}" },

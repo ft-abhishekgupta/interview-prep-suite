@@ -45,7 +45,14 @@ public class PaidState implements OrderState {
 }
 
 public class ShippedState implements OrderState {
-    public void process(Order order) { System.out.println("Already shipped, nothing to do"); }
+    public void process(Order order) {
+        System.out.println("Order delivered");
+        order.setState(new DeliveredState());
+    }
+}
+
+public class DeliveredState implements OrderState {
+    public void process(Order order) { System.out.println("Already delivered, nothing to do"); }
 }
 
 public class Order {

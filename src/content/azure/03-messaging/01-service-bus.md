@@ -69,7 +69,7 @@ ServiceBusReceivedMessage msg = await receiver.ReceiveMessageAsync();
 
 ## Lock duration and lock renewal
 
-Peek-lock messages have a **lock duration** (default 30–60 seconds, configurable up to 5 minutes) during which the consumer must either complete, abandon, or dead-letter the message, or renew the lock. Processing that can take longer than the lock duration must call `RenewMessageLockAsync` periodically (most SDKs' message-processor abstractions do this automatically) — otherwise the lock silently expires mid-processing, the message becomes available to another consumer, and you can end up processing the same message twice concurrently.
+Peek-lock messages have a **lock duration** (default 1 minute, configurable from 5 seconds up to 5 minutes) during which the consumer must either complete, abandon, or dead-letter the message, or renew the lock. Processing that can take longer than the lock duration must call `RenewMessageLockAsync` periodically (most SDKs' message-processor abstractions do this automatically) — otherwise the lock silently expires mid-processing, the message becomes available to another consumer, and you can end up processing the same message twice concurrently.
 
 ## Max delivery count and the dead-letter queue
 

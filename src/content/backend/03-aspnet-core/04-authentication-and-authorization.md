@@ -80,7 +80,7 @@ public class ApiKeyAuthHandler : AuthenticationHandler<ApiKeyAuthOptions>
 // registration: builder.Services.AddAuthentication().AddScheme<ApiKeyAuthOptions, ApiKeyAuthHandler>("ApiKey", null);
 ```
 
-Basic authentication (username/password Base64-encoded in the `Authorization` header) is rarely appropriate for a public API — the encoding isn't encryption, and credentials travel on every request — but it still shows up for internal tooling sitting behind mTLS or a VPN where the transport is already trusted. Both schemes above are bearer credentials with no built-in identity or permission model of their own, so treat an API key the same way you'd treat a password: store only a hash server-side, scope each key to a specific client and a minimal set of operations, and support rotation, because a leaked key is valid until someone notices and revokes it.
+Basic authentication (username/password Base64-encoded in the `Authorization` header) is rarely appropriate for a public API — the encoding isn't encryption, and credentials travel on every request — but it still shows up for internal tooling sitting behind mTLS or a VPN where the transport is already trusted. API keys and Basic credentials are bearer-style secrets with no built-in identity or permission model of their own, so treat an API key the same way you'd treat a password: store only a hash server-side, scope each key to a specific client and a minimal set of operations, and support rotation, because a leaked key is valid until someone notices and revokes it.
 
 ## JWT bearer validation
 

@@ -62,7 +62,7 @@ In UI apps (WPF, WinForms, old ASP.NET) there is a `SynchronizationContext` that
 | Scenario | Use `ConfigureAwait(false)`? |
 |---|---|
 | Library / class-library code with no UI dependency | Yes — avoids forcing context capture on every caller |
-| ASP.NET Core (no `SynchronizationContext` by default) | Mostly irrelevant, but still a cheap habit |
+| ASP.NET Core app code (no `SynchronizationContext` by default) | No real effect — use it in shared libraries, not as an ASP.NET Core throughput trick |
 | UI event handler that updates a control after `await` | No — you need the UI context back |
 | Classic ASP.NET (has a request `SynchronizationContext`) | Yes, in library code — helps avoid deadlocks |
 
@@ -131,7 +131,7 @@ sequenceDiagram
 - `Task` = no result, `Task<T>` = a result, `ValueTask<T>` = a result that avoids allocation on a hot synchronous path.
 - Async ≠ parallel: async is about not blocking threads, parallel is about using multiple cores.
 - `await` suspends the method; `.Result`/`.Wait()` blocks the thread — never mix them in library code.
-- `ConfigureAwait(false)` in library code avoids capturing `SynchronizationContext`; usually unnecessary in ASP.NET Core.
+- `ConfigureAwait(false)` is mainly a library concern; in ASP.NET Core app code it is effectively a no-op for context capture.
 - `async void` only for event handlers — exceptions there are unobservable and can crash the process.
 - Go "async all the way down" — don't block on async code partway up the call chain.
 - Exceptions in `async Task` are stored on the task and rethrown on `await`.

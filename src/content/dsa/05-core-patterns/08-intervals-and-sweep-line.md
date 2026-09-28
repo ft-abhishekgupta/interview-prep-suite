@@ -106,7 +106,7 @@ public int minMeetingRooms(int[][] intervals) {
 ```
 
 > [!TIP]
-> The two-pointer version above and a heap-of-end-times version are both `O(n log n)` and both valid to mention — the heap version pushes each meeting's end time and pops whenever the earliest end is `≤` the new meeting's start, with the final heap size being the answer.
+> The sorted-starts/two-pointer version and a heap-of-end-times version are both `O(n log n)` and both valid to mention — the heap version pushes each meeting's end time and pops whenever the earliest end is `≤` the new meeting's start, with the final heap size being the answer.
 
 ## Sweep line with a heap or a difference map
 
@@ -165,6 +165,14 @@ public boolean book(int start, int end) {
 
 > [!DANGER]
 > The most common bug in this entire topic: using `<` when you meant `<=` (or vice versa) at the boundary where one interval ends and the next begins. "Do `[1, 5]` and `[5, 10]` overlap?" has no universal answer — it depends on whether the problem's endpoints are inclusive or exclusive, and you must ask or state your assumption before coding.
+
+## Endpoint models and tie ordering
+
+Sweep-line code must define what happens when two events share the same timestamp. For half-open intervals like meetings `[start, end)`, an end at time `t` should be processed before a start at time `t`, because the room is free for the new meeting. For closed integer intervals `[start, end]`, a start at `t` and an end at `t` overlap at that exact point, so starts may need to be processed before ends, or the difference-array decrement moves to `end + 1`. The algorithm is the same, but the tie ordering encodes the problem's semantics.
+
+The same model affects merge and insert code. If intervals are closed, `next.start <= current.end` merges touching endpoints; if they are half-open, `next.start < current.end` is the overlap test and touching endpoints remain separate. For balloon arrows, endpoints are usually closed, so a balloon starting exactly where the current arrow sits can still be burst. For meeting rooms, endpoints are usually half-open. Say the model before choosing the comparison operator.
+
+For online interval APIs, do not only check the interval that starts before the new booking. The next interval by start time can also overlap the new booking from the right. That is why the `TreeMap` solution checks both `floorEntry(start)` and `ceilingEntry(start)`.
 
 ## Cheat sheet
 

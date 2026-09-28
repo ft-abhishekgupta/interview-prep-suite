@@ -119,7 +119,7 @@ Even single-leader replication, the simplest topology, is worth deploying purely
 
 - **Single-leader**: no write conflicts, but one write bottleneck and a failover story to get right — the default choice.
 - **Multi-leader**: writes scale and survive a region outage, but you now need conflict resolution.
-- **Leaderless (quorum-based)**: any node can serve reads/writes; consistency is tuned via `W + R > N`.
+- **Leaderless (quorum-based)**: any node can serve reads/writes; `W + R > N` gives read/write overlap for latest-version or read-your-writes reads when versions are reconciled.
 - **Sync** replication = no data loss, higher latency. **Async** = fast, but `RPO > 0`. **Semi-sync** is a common middle ground.
 - **Replication lag** breaks read-your-own-writes — fix by routing that user's reads to the leader, not by making everything synchronous.
 - **Split brain** happens when a recovered old leader still thinks it's in charge — always pair failover with **fencing** and a **quorum** decision.
@@ -146,7 +146,7 @@ Replication is the base layer for scaling reads, surviving failures, and going m
 
 ### Q1. Compare single-leader, multi-leader and leaderless replication, and explain when you'd choose each.
 
-Single-leader routes all writes through one primary and fans reads out to followers — it's the simplest model because there's exactly one writer, so no conflicting writes are possible, and it's the right default for most systems. Multi-leader allows writes at more than one node (typically one leader per region for a multi-region active-active setup), which improves write availability and latency across regions but requires conflict resolution since two leaders can accept writes to the same key concurrently. Leaderless (Dynamo-style) lets any node accept reads or writes and relies on quorum overlap (`W + R > N`) for consistency, which maximizes availability and write throughput at the cost of needing the client or coordinator to reconcile divergent replica states. Choose single-leader by default, multi-leader when you need low-latency writes in multiple regions and can tolerate conflict resolution, and leaderless when you need extreme write availability and can design around eventual consistency.
+Single-leader routes all writes through one primary and fans reads out to followers — it's the simplest model because there's exactly one writer, so no conflicting writes are possible, and it's the right default for most systems. Multi-leader allows writes at more than one node (typically one leader per region for a multi-region active-active setup), which improves write availability and latency across regions but requires conflict resolution since two leaders can accept writes to the same key concurrently. Leaderless (Dynamo-style) lets any node accept reads or writes and uses quorum overlap (`W + R > N`) so a read quorum intersects the acknowledged write quorum; the client or coordinator must still compare versions and reconcile divergent replicas, and the guarantee is not the same as serializable transactions. Choose single-leader by default, multi-leader when you need low-latency writes in multiple regions and can tolerate conflict resolution, and leaderless when you need extreme write availability and can design around eventual consistency.
 
 ### Q2. What is the difference between synchronous, asynchronous, and semi-synchronous replication?
 

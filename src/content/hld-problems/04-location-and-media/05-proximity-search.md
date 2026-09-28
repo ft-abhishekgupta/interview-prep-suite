@@ -84,12 +84,9 @@ erDiagram
 
 ## API design
 
-```
+```http
 // Search for businesses
 GET /businesses?query&location&category&page -> Business[]
-
-// View business details and reviews
-GET /businesses/:businessId -> Business & Review[]
 
 // View business details
 GET /businesses/:businessId -> Business

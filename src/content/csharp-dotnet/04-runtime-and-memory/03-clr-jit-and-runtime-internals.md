@@ -32,7 +32,7 @@ public int Add(int a, int b) => a + b;
 
 compiles to IL resembling:
 
-```
+```text
 ldarg.1
 ldarg.2
 add

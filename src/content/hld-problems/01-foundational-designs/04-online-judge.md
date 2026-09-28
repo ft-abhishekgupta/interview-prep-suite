@@ -81,7 +81,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 GET /problems?page=1&limit=100 -> Partial<Problem>[]
 
 GET /problems/:id?language={language} -> Problem

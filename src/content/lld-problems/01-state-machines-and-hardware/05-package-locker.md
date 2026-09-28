@@ -147,15 +147,17 @@ public class Compartment {
         return size;
     }
 
-    public boolean isOccupied() {
+    public synchronized boolean isOccupied() {
         return occupied;
     }
 
-    public void markOccupied() {
+    public synchronized boolean tryMarkOccupied() {
+        if (occupied) return false;
         occupied = true;
+        return true;
     }
 
-    public void markFree() {
+    public synchronized void markFree() {
         occupied = false;
     }
 
@@ -200,19 +202,23 @@ public class Locker {
 
     public String depositPackage(Size size) {
         Compartment compartment = compartments.stream()
-            .filter(c -> c.getSize() == size && !c.isOccupied())
+            .filter(c -> c.getSize() == size)
+            .filter(Compartment::tryMarkOccupied)
             .findFirst()
             .orElseThrow(() -> new IllegalStateException("No available compartment of size " + size));
 
-        // Atomic claim: putIfAbsent fails if the compartment lost the race for this size.
-        compartment.markOccupied();
-        compartment.open();
-
-        AccessToken token = new AccessToken(codeGen.nextCode(), Instant.now().plus(Duration.ofDays(7)), compartment);
-        if (tokens.putIfAbsent(token.getCode(), token) != null)
-            throw new IllegalStateException("Code collision, retry deposit");
-
-        return token.getCode();
+        try {
+            compartment.open();
+            AccessToken token = new AccessToken(codeGen.nextCode(), Instant.now().plus(Duration.ofDays(7)), compartment);
+            if (tokens.putIfAbsent(token.getCode(), token) != null) {
+                compartment.markFree();
+                throw new IllegalStateException("Code collision, retry deposit");
+            }
+            return token.getCode();
+        } catch (RuntimeException e) {
+            compartment.markFree();
+            throw e;
+        }
     }
 
     public void pickup(String code) {

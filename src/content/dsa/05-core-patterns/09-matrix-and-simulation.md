@@ -127,7 +127,7 @@ A transpose swaps `matrix[i][j]` with `matrix[j][i]`; for a non-square matrix th
 | Row-major vs column-major | Row-major (Java, C, C++): rows are contiguous. Column-major (Fortran, MATLAB): columns are contiguous |
 
 ```java
-// Binary search a row-sorted, column-sorted matrix as if it were flat 1-D
+// Binary search a fully row-major sorted matrix as if it were flat 1-D
 int lo = 0, hi = rows * cols - 1;
 while (lo <= hi) {
     int mid = lo + (hi - lo) / 2;
@@ -168,14 +168,15 @@ The trick for updating every cell **simultaneously** without a second buffer: en
 
 ```java
 // O(rows * cols) time, O(1) extra space
-// Encoding: 0 = dead->dead, 1 = live->live, 2 = live->dead, 3 = dead->live
+// Encoding uses bit 0 as the old state and bit 1 as the new state:
+// 0 = dead->dead, 1 = live->dead, 2 = dead->live, 3 = live->live
 for (int r = 0; r < rows; r++)
     for (int c = 0; c < cols; c++) {
         int liveNeighbors = countLiveNeighbors(board, r, c);  // reads only original bit (board[i][j] & 1)
-        if ((board[r][c] & 1) == 1 && (liveNeighbors < 2 || liveNeighbors > 3))
-            board[r][c] = 2;                      // live -> dead
+        if ((board[r][c] & 1) == 1 && (liveNeighbors == 2 || liveNeighbors == 3))
+            board[r][c] = 3;                       // live -> live
         if ((board[r][c] & 1) == 0 && liveNeighbors == 3)
-            board[r][c] = 3;                       // dead -> live
+            board[r][c] = 2;                       // dead -> live
     }
 for (int r = 0; r < rows; r++)
     for (int c = 0; c < cols; c++)
@@ -191,6 +192,14 @@ for (int r = 0; r < rows; r++)
 | First-row/column as markers | `O(1)` | Set matrix zeroes without a separate marker set |
 | Bit-packing two states per cell | `O(1)` | Simultaneous whole-grid update (Game of Life) |
 | BFS/DFS with a visited grid | `O(rows·cols)` | Flood fill, islands, shortest path on a grid |
+
+## Mutability and representation choices
+
+Before using an in-place trick, confirm the input may be mutated. Marking visited cells with a sentinel is elegant for flood fill and word search, but it is wrong if the caller expects the grid unchanged after the function returns; in that case, use a separate `visited` grid or restore every changed cell during backtracking. The same trade-off appears in Set Matrix Zeroes: reusing row 0 and column 0 is `O(1)` space, but it deliberately overwrites the matrix as scratch state.
+
+Representation also changes performance and indexing. Java's `int[][]` is an array of row arrays, not one contiguous rectangular block, so `matrix.length` is the row count and each row technically has its own length. Interview grids are normally rectangular, but defensive production code should not assume `matrix[0].length` applies to every row unless the input contract says so. For flattening, the row-major formulas `index = r * cols + c` and `(r, c) = (index / cols, index % cols)` only preserve sorted order when the whole matrix is sorted in row-major order, not merely when each row and each column is independently sorted.
+
+For BFS simulations such as rotting oranges or shortest path in a grid, process by layers when the answer is time or distance. Store the queue size at the start of each minute/level, expand exactly that many cells, then increment the time after the layer finishes. Incrementing time per cell instead of per layer is a subtle simulation bug in practice.
 
 ## Cheat sheet
 

@@ -43,7 +43,7 @@ The **happens-before relation** (`→`) is defined as: if A and B are on the sam
 
 A Lamport clock is a single counter per process, incremented on every local event, and updated on message receipt to be greater than both the local counter and the sender's stamped value.
 
-```
+```text
 Rule 1: on any local event, counter = counter + 1
 Rule 2: on send, attach current counter to the message
 Rule 3: on receive, counter = max(local counter, message counter) + 1
@@ -94,7 +94,7 @@ A common shortcut for resolving conflicting concurrent writes is **last-write-wi
 | **Application-level merge** | Domain logic decides (e.g. merge shopping carts) | Depends on the merge quality |
 
 > [!DANGER]
-> DynamoDB and Cassandra both default to LWW at the column/cell level unless you opt into more careful conflict handling. In an interview, naming this trade-off explicitly ("LWW is simple but can silently drop a concurrent write — I'd only accept that for data where losing an update is cheap") is a strong signal.
+> Cassandra uses timestamp-based LWW at the cell level, and DynamoDB Global Tables use LWW-style reconciliation for cross-region conflicts. In an interview, naming this trade-off explicitly ("LWW is simple but can silently drop a concurrent write — I'd only accept that for data where losing an update is cheap") is a strong signal.
 
 ## Ordering guarantees in message systems and idempotency as an alternative
 
@@ -173,7 +173,7 @@ TrueTime is Google's API that returns not a single timestamp but a bounded inter
 
 ### Q8. What is last-write-wins conflict resolution, and when is it a bad choice?
 
-LWW resolves a conflicting write to the same key by keeping whichever write carries the higher timestamp and discarding the other — simple, requires no extra metadata, and is the default in systems like Cassandra and DynamoDB at the column level. It's a bad choice whenever two writes can be genuinely concurrent and losing one silently is unacceptable: because "higher timestamp" is often an artifact of clock skew rather than true precedence, a real, intentional write can be discarded without anyone noticing. Better options — vector clocks that detect true concurrency and surface both versions to the application, or CRDTs that merge concurrent updates mathematically for supported data types (counters, sets) — cost more complexity but avoid silent data loss. I'd accept LWW only where losing an update is genuinely cheap, e.g. a "last seen" timestamp or a cache entry.
+LWW resolves a conflicting write to the same key by keeping whichever write carries the higher timestamp and discarding the other — simple and requiring no extra metadata. Cassandra uses this style at the cell level, and DynamoDB Global Tables use it to reconcile cross-region conflicts. It's a bad choice whenever two writes can be genuinely concurrent and losing one silently is unacceptable: because "higher timestamp" is often an artifact of clock skew rather than true precedence, a real, intentional write can be discarded without anyone noticing. Better options — vector clocks that detect true concurrency and surface both versions to the application, or CRDTs that merge concurrent updates mathematically for supported data types (counters, sets) — cost more complexity but avoid silent data loss. I'd accept LWW only where losing an update is genuinely cheap, e.g. a "last seen" timestamp or a cache entry.
 
 ### Q9. Scenario: two users concurrently update the same shopping cart from different devices and one item silently disappears. What went wrong and how would you fix it?
 

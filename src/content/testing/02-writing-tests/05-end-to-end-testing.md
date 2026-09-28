@@ -141,7 +141,7 @@ A flaky test that stays in the release-blocking pipeline trains the team to igno
 
 1. Move it out of the blocking pipeline immediately (a "quarantine" tag/suite), so it stops eroding trust while still running and reporting separately.
 2. Track it with an owner and a deadline — quarantine is not a graveyard.
-3. Fix the root cause (usually one of the causes in the table above) or delete the test if it's not earning its keep.
+3. Fix the root cause (usually timing, data, environment, animation, network or ordering) or delete the test if it's not earning its keep.
 
 > [!WARNING]
 > Quarantining without a follow-up process just becomes a slow, silent way to delete test coverage. Track quarantined tests explicitly and revisit them on a schedule.

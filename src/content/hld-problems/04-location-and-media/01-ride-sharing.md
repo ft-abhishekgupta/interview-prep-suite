@@ -57,7 +57,7 @@ Assume a global platform operating in many cities simultaneously.
 | Read:write ratio (matching) | ~15:1 | each request scans ~15–20 candidate drivers via geo-query |
 | Location data footprint | ~12.5 MB/s ingest | 125,000 writes/s × ~100 bytes/ping |
 | Trip storage | ~5 GB/day | 5M trips × ~1 KB record |
-| GPS trail (cold storage) | ~1 TB/day | if 1-in-5 pings archived at ~250 bytes with metadata |
+| GPS trail (cold storage) | ~540 GB/day | 125,000/s ÷ 5 × 250B × 86,400s |
 
 > [!TIP]
 > Say the assumption out loud before the number: *"I'll assume 5% of registered drivers are online at any moment in a metro area — that's the number that drives everything downstream."* Interviewers care more about the reasoning chain than the exact digit.
@@ -86,7 +86,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST   /v1/fare-estimates          Body: { pickup, destination }              -> { fareEstimateId, priceRange, surgeMultiplier }
 POST   /v1/trips                   Body: { fareEstimateId }                   -> { tripId, status: "matching" }
 PATCH  /v1/trips/{id}               Body: { action: accept|decline }           -> { status }
@@ -200,7 +200,7 @@ sequenceDiagram
 
 - **Bad**: application-level in-memory locking — breaks the moment you run more than one Matching Service instance.
 - **Good**: a DB row-level lock/status transition (`UPDATE drivers SET status='pending' WHERE id=? AND status='available'`) — works, but ties matching latency to database round trips.
-- **Great**: a short-TTL distributed lock in Redis (`SET key value NX EX 8`), released on decline/timeout or converted to a hard `on_trip` status on accept. The TTL bounds the damage if the Matching Service itself crashes mid-dispatch.
+- **Great**: a short-TTL distributed lock in Redis (`SET key value NX EX 8`) for dispatch, followed by a durable conditional status transition on accept (`UPDATE drivers SET status='on_trip' WHERE id=? AND status='pending' AND pending_trip_id=?`). The TTL bounds the damage if the Matching Service itself crashes mid-dispatch, while the database transition is the final source of truth for "one active trip per driver."
 
 ![alt text](notes/HLD/Problems/Uber/image-7.png)
 
@@ -257,7 +257,7 @@ Put together — geo index, ingestion pipeline, matching, trip state, pricing, a
 
 - Current driver location = in-memory geo index (Redis geohash); historical trail = async, via Kafka, never on the hot path.
 - Compare geohash vs quadtree vs S2 by sharding ease vs. accuracy — name the trade-off, don't just pick one.
-- One driver, one active trip is a **strong consistency** invariant — enforce with a short-TTL distributed lock, not app-memory or eventual consistency.
+- One driver, one active trip is a **strong consistency** invariant — use a short-TTL dispatch lock plus a durable conditional driver-status update, not app-memory or eventual consistency.
 - Adaptive ping interval trades freshness for ingestion load.
 - Surge is demand/supply per geo-cell over a rolling window, locked in at request time.
 - Payment at trip end must be idempotent, keyed by `tripId`.
@@ -276,7 +276,7 @@ Put together — geo index, ingestion pipeline, matching, trip state, pricing, a
 
 ## Summary
 
-A ride-sharing platform is a location-first system: the geospatial index and the ingestion pipeline that feeds it are the real engineering problem, not the CRUD around trips and payments. Get the geohash/quadtree/S2 trade-off right, keep the "one active trip per driver" invariant strongly consistent with a short-TTL lock, decouple the hot location-write path from cold historical storage, and make the payment step idempotent. Everything else — surge pricing, tracking, trip state — is comparatively straightforward once those four pieces are solid.
+A ride-sharing platform is a location-first system: the geospatial index and the ingestion pipeline that feeds it are the real engineering problem, not the CRUD around trips and payments. Get the geohash/quadtree/S2 trade-off right, keep the "one active trip per driver" invariant strongly consistent with a short-TTL dispatch lock plus durable status transition, decouple the hot location-write path from cold historical storage, and make the payment step idempotent. Everything else — surge pricing, tracking, trip state — is comparatively straightforward once those four pieces are solid.
 
 ## Top Interview Questions
 
@@ -286,7 +286,7 @@ A relational database's spatial index (e.g., PostGIS with a quadtree/R-tree) sup
 
 ### Q2. Walk through what happens if two riders' requests both pick the same nearest driver.
 
-Both requests hit the Matching Service roughly concurrently, and both geo-queries return the same driver as the top candidate. Whichever request's dispatch attempt executes `SET lock:driver:42 NX EX 8` first wins the lock; the second attempt fails the `NX` check and immediately falls through to its next-ranked candidate instead of retrying the same driver. The winning request dispatches the ride request to the driver's app; on accept, the trip service transitions the driver to `on_trip` (a durable status change), and the lock is released or simply expires. This makes the "one driver, one active trip" invariant enforceable even with multiple Matching Service instances running concurrently.
+Both requests hit the Matching Service roughly concurrently, and both geo-queries return the same driver as the top candidate. Whichever request's dispatch attempt executes `SET lock:driver:42 NX EX 8` first wins the short-lived dispatch lock; the second attempt fails the `NX` check and immediately falls through to its next-ranked candidate instead of retrying the same driver. The winning request dispatches the ride request to the driver's app; on accept, the trip service performs a conditional durable transition to `on_trip` for that same `pending_trip_id`, and only that update makes the assignment final. This combination makes the "one driver, one active trip" invariant enforceable even with multiple Matching Service instances running concurrently.
 
 ### Q3. How would you compute and update surge pricing?
 
@@ -327,7 +327,3 @@ The trail topic is designed for downstream, latency-tolerant consumers (analytic
 ### Q12. How do you handle a driver who force-quits the app mid-trip?
 
 The trip is not considered complete just because location pings stop; the Trip Service should treat a gap in pings (beyond a grace period, e.g., 30–60 s) as a signal to alert support and surface a "driver connection lost" state to the rider rather than silently failing. If the app reconnects, the driver's last known trip context is restored from the durable trip record (not from the ephemeral geo index) so the trip can resume tracking. If the gap persists past a longer threshold, the platform can offer the rider a way to end/cancel the trip through a support flow, and the fare is settled based on the last confirmed distance/time rather than being lost entirely, since the trip and fare records are written to durable storage independent of the live location stream.
-
-### Q13. A dispatched driver simply never responds — no accept, no decline. How do you handle that without either losing the rider's request or leaving the driver's lock stuck?
-
-The short-TTL distributed lock already bounds the worst case: if no accept arrives before the TTL, the lock expires and the driver becomes eligible again, so nothing stays stuck indefinitely. The remaining question is retry orchestration — automatically trying the next-ranked candidate, and possibly circling back to the original driver later. A hand-rolled solution (a delayed message requeued after the timeout) works but accumulates real coordination complexity once you account for cancellations, multiple retries, and partial failures. A durable execution platform like Temporal or AWS Step Functions is the stronger production answer: retries, timeouts, and state transitions across the whole dispatch-to-match workflow become configuration on a managed primitive rather than bespoke queue-and-timer code the matching service has to get right itself.

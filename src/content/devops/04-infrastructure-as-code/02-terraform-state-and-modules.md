@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [terraform, infrastructure-as-code, state-management, modules]
 ---
 
-The state file is the part of Terraform most people ignore until it bites them — it is the single source of truth Terraform uses to map your configuration onto real-world resource IDs, and mishandling it causes some of the worst outages in infrastructure-as-code. This page covers state mechanics, the operations you use to fix state when it drifts from reality, and how to structure modules so a growing codebase stays composable instead of becoming an unmaintainable monolith.
+The state file is the part of Terraform most people ignore until it bites them — it is the single source of truth Terraform uses to map your configuration onto real-world resource IDs, and mishandling it causes some of the worst outages in infrastructure-as-code. The practical skills are state mechanics, the operations used to fix state when it drifts from reality, and module structures that keep a growing codebase composable instead of becoming an unmaintainable monolith.
 
 ## What state is and why it exists
 

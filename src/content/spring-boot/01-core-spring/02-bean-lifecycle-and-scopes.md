@@ -174,7 +174,12 @@ For clean shutdown, close resources in `@PreDestroy`. A thread pool must be told
 @PreDestroy
 void shutdown() {
     executor.shutdown();                       // stop accepting new tasks
-    executor.awaitTermination(30, SECONDS);    // let running tasks finish
+    try {
+        if (!executor.awaitTermination(30, TimeUnit.SECONDS)) executor.shutdownNow();
+    } catch (InterruptedException e) {
+        executor.shutdownNow();
+        Thread.currentThread().interrupt();
+    }
 }
 ```
 

@@ -49,6 +49,8 @@ A URL shortener turns a long link into a compact, shareable code and redirects v
 | Storage (5 years) | 500M/mo × 60 mo × 500B | 30B rows × 500B | ~15 TB |
 | Peak bandwidth | 58,000 QPS × ~1KB response | 58,000 × 1KB | ~464 Mbps |
 
+Base62 keyspace is the sanity check behind the code length: `62^6 ≈ 56.8B` possible codes, which is uncomfortably close once 30B rows plus custom aliases, deleted-but-reserved codes, and future growth are considered; `62^7 ≈ 3.5T`, giving enough headroom for the 5-year estimate without relying on collision-prone retries.
+
 > [!TIP]
 > Saying "reads outnumber writes 100 to 1, so I'll optimize the read path with caching and treat writes as the simpler, less latency-sensitive path" is exactly the sentence an interviewer wants to hear in the first two minutes.
 
@@ -83,7 +85,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST /api/urls
 { "long_url": "https://example.com/very/long/path", "custom_alias": "optional", "expires_at": "optional" }
 -> 201 { "short_url": "https://short.ly/abc123" }

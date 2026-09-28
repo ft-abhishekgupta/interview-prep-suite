@@ -155,7 +155,7 @@ Records are the idiomatic modern choice for immutable data-carrying types (DTOs,
 | Mistake | Fix |
 |---|---|
 | Assuming `==` on classes compares field values | Override `Equals`/`GetHashCode` or use a `record` |
-| Believing a `struct` never allocates | It allocates when boxed, stored in an array, or captured in a closure |
+| Believing a `struct` can never live on the heap | It is copied into a heap object when boxed and can live inline inside a heap object, array, or closure |
 | Passing a large struct by value in hot code paths | Pass with `in` or convert to a class/record |
 | Mutating a struct returned from a property (`p.Location.X = 5`) | Struct properties return copies — this silently mutates a temporary and does nothing; C# actually blocks this for non-readonly properties as a compile error |
 | Comparing boxed value types with `==` on `object` | Falls back to reference equality unless the underlying `Equals` is used |

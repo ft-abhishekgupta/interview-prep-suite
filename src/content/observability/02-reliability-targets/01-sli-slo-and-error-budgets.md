@@ -91,7 +91,7 @@ Burn rate is how fast you're consuming the error budget relative to the rate tha
 | 2x | Twice the sustainable rate | 15 days | Watch closely, investigate |
 | 6x | Significant sustained issue | 5 days | Page — needs same-day attention |
 | 14.4x | Severe, fast-onset | ~2 days | Page immediately — active incident |
-| 60x | Consuming a full day's allowance in ~12 hours | ~12 hours | Sev1, likely a full outage |
+| 60x | Consuming the full 30-day budget in ~12 hours | ~12 hours | Sev1, likely a full outage |
 
 The core formula: `time to exhaustion = budget remaining / current burn rate`. If you've already burned 20% of the month's budget and it's day 5 of 30, your burn rate so far is `(20% / 5 days) / (100% / 30 days) = 1.2x` — trending to exhaust the whole month's budget by around day 25, five days early.
 
@@ -103,7 +103,7 @@ An SLA is what you promise externally, usually to a customer or in a contract, a
 
 If your service calls three downstream dependencies, each with its own SLO, your own achievable availability is bounded by the combination of theirs (for calls made in series, not in parallel/fallback):
 
-```
+```text
 Composite availability ≈ SLO_A × SLO_B × SLO_C
 99.95% × 99.9% × 99.99% ≈ 99.84%
 ```

@@ -121,7 +121,7 @@ Both controllers typically delegate to the same underlying domain/service layer,
 ## Migrating clients
 
 1. **Ship v2 alongside v1** — never a hard cutover.
-2. **Announce** with the deprecation headers above, docs, and (for high-value partners) direct outreach.
+2. **Announce** with the `Deprecation`, `Sunset`, and `Link` headers, docs, and (for high-value partners) direct outreach.
 3. **Instrument** — log which version and, if possible, which client/API key is calling each version so you know who's left before you turn v1 off.
 4. **Provide a compatibility/migration guide** — a diff of exactly what changed, ideally with a small script or SDK that handles translation.
 5. **Sunset gradually** — return warnings for a period, then start returning `410 Gone` after the sunset date rather than silently changing behaviour.

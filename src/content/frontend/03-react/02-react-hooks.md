@@ -75,6 +75,8 @@ useEffect(() => {
 > [!DANGER]
 > The classic infinite loop: an effect calls `setState`, and that state is also a dependency of the same effect, with no condition guarding it. Each render triggers the effect, which triggers a state update, which triggers a render — forever. The fix is either to remove the redundant dependency, derive the value instead of storing it, or add a guard that only sets state when the value actually changes.
 
+In React 18 development builds under `<StrictMode>`, React intentionally runs an effect's setup, cleanup, then setup again on mount to expose missing or asymmetric cleanup. Production does not double-run effects for this reason, but effect setup and cleanup should still be written as repeatable synchronization with an external system, not as a one-time lifecycle assumption.
+
 **Why an object or array dependency re-runs every render:** React compares dependencies with `Object.is` (reference equality), not deep equality. A literal `{}` or `[]` created inline in the render body is a *new reference* every render, so the effect fires every time even though the "content" looks the same.
 
 ```typescript
@@ -189,6 +191,7 @@ function useOnlineStatus() {
 - Hooks are ordered slots on the fiber — never call conditionally, in loops, or after an early return.
 - `setState` is async and batched; use the functional updater when next state depends on previous state.
 - Effects run after paint; `useLayoutEffect` runs before paint and blocks it — use sparingly.
+- React 18 StrictMode double-runs effect setup/cleanup on mount in development to reveal missing cleanup.
 - Object/array/function literals in a dependency array are new references every render — memoise or depend on primitives.
 - If you can derive it during render, don't put it in state + an effect.
 - `useMemo`/`useCallback` are for referential stability, not general speed — measure before adding them.
@@ -202,6 +205,7 @@ function useOnlineStatus() {
 |---|---|
 | Calling a hook inside `if` or after a `return` | Move the condition inside the hook body |
 | Missing dependency causing stale values in a closure | Add the dependency, or use the functional updater / a ref |
+| Treating React 18 StrictMode double effects as production behavior | Keep cleanup symmetrical; the double run is a development check |
 | Object literal in a dependency array | Depend on primitive fields, or memoise the object |
 | Using `useEffect` to derive state from props | Compute the value directly in render |
 | Wrapping every function in `useCallback` "just in case" | Only memoise when passed to a memoised child or another hook's deps |

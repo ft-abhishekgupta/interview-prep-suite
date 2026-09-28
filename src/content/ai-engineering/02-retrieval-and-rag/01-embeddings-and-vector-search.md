@@ -108,7 +108,7 @@ Unlike a plain key-value store, most ANN index structures (especially graph-base
 
 Changing your embedding model — for better quality, lower dimensionality, or lower cost — means **every vector in your corpus must be regenerated**, because embeddings from different models are not compatible with each other (they live in unrelated vector spaces, even at the same dimensionality). For a large corpus this is a real, budgeted migration:
 
-| Corpus | Embedding cost (approx, at $0.02 / 1M tokens) | Notes |
+| Corpus | Illustrative embedding cost (hypothetical $0.02 / 1M tokens) | Notes |
 |---|---|---|
 | 10M chunks × 200 tokens avg | ~$40 | Cheap in absolute terms, but still an operational migration (re-index, cutover, dual-write) |
 | 500M chunks × 200 tokens avg | ~$2,000 | Real budget line item; batch and rate-limit carefully |

@@ -76,7 +76,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 // Enforcement is not a client-facing API — it's a check invoked per request:
 Check(identity, resource) -> { allowed: bool, remaining: int, resetAt: timestamp }
 
@@ -148,7 +148,7 @@ A common answer: enforce coarse, identity-level limits at the gateway (protects 
 
 ## Deep dive: distributed counters and atomicity
 
-The hard part of a distributed rate limiter is that many gateway nodes check the same identity's counter concurrently — a naive `GET` then `SET` race lets two nodes both see 99/100 and both allow the 100th and 101st request. Redis solves this with an atomic increment-and-check in one round trip, typically a Lua script so the check-and-increment is a single atomic operation on the server:
+The hard part of a distributed rate limiter is that many gateway nodes check the same identity's counter concurrently — a naive `GET` then `SET` race lets two nodes both see 99/100 and both allow the 100th and 101st request. For a fixed-window counter, Redis solves this with an atomic increment-and-check in one round trip, typically a Lua script so the check-and-increment is a single atomic operation on the server:
 
 ```lua
 -- KEYS[1] = counter key, ARGV[1] = limit, ARGV[2] = window seconds
@@ -161,6 +161,8 @@ if current > tonumber(ARGV[1]) then
 end
 return 1      -- allowed
 ```
+
+For the token-bucket default described above, the script changes shape — store `tokens` and `last_refill_at` in a Redis hash, refill based on Redis server time, then decrement one token if available — but the requirement is identical: the read, refill, decrement, and write must all happen in one server-side operation. A client-side `GET`, compute, then `SET` race is wrong for both algorithms.
 
 > [!WARNING]
 > Clock skew between gateway nodes matters for time-window algorithms. If node A's clock is 2 seconds ahead, it may open a new window early and grant extra requests. Mitigate by letting Redis (a single source of truth) own the window boundary via `TTL`/`EXPIRE` rather than trusting each node's local clock, and by using NTP-synced hosts.

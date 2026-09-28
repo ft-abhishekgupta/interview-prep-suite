@@ -25,7 +25,7 @@ Isolation level is the single knob that trades correctness guarantees for concur
 | Read Committed | Prevented | Possible | Possible | Possible | Possible |
 | Repeatable Read | Prevented | Prevented | Possible | Prevented (via locking) | Possible |
 | Serializable | Prevented | Prevented | Prevented | Prevented | Prevented |
-| Snapshot (MVCC) | Prevented | Prevented | Prevented | Possible (needs explicit handling) | Possible |
+| Snapshot (MVCC) | Prevented | Prevented | Prevented for repeat reads; still not serializable | Same-row conflicts are usually aborted, but application must retry | Possible |
 
 > [!KEY]
 > Higher isolation is not free — each step up the standard ladder (Read Uncommitted → Serializable) holds locks longer or more broadly, reducing concurrency. Snapshot isolation is the interesting exception: it prevents dirty/non-repeatable/phantom reads **without blocking readers against writers at all**, at the cost of tempdb space for row versions.
@@ -132,7 +132,7 @@ sequenceDiagram
     DB-->>A: 6 rows - phantom row appeared
 ```
 
-Under `REPEATABLE READ`, this can still happen because that level only locks the specific rows already read, not the range itself — `SERIALIZABLE` closes the gap by range-locking, preventing B's insert from committing until A's transaction finishes.
+Under standard SQL and SQL Server `REPEATABLE READ`, this can still happen because that level locks the specific rows already read, not the range itself — `SERIALIZABLE` closes the gap by range-locking, preventing B's insert from committing until A's transaction finishes. InnoDB's `REPEATABLE READ` is stronger for many locking reads because next-key locks protect index gaps and prevent many phantoms, so qualify the engine before making a blanket claim.
 
 ## Cheat sheet
 
@@ -141,7 +141,7 @@ Under `REPEATABLE READ`, this can still happen because that level only locks the
 - `SERIALIZABLE` prevents all four standard anomalies via range locking, at the highest concurrency cost.
 - MVCC-based levels (RCSI, Snapshot) prevent dirty/non-repeatable/phantom reads **without blocking readers against writers** at all — the cost moves to tempdb version storage.
 - RCSI gives each **statement** a fresh snapshot; SNAPSHOT gives the whole **transaction** one consistent snapshot and can raise a 3960 update-conflict error.
-- Lost update is not fixed by isolation level alone unless you also take an update lock (`UPDLOCK`) or express the operation as a single atomic statement.
+- Read Committed allows read-compute-write lost updates; Repeatable Read/Serializable prevent the silent overwrite by blocking or aborting, but `UPDLOCK` or a single atomic `UPDATE` avoids conversion deadlocks and retry churn.
 - Optimistic concurrency scales better under low contention; pessimistic is simpler to reason about under high contention.
 - Long transactions under snapshot isolation bloat the tempdb version store — keep them short.
 - T-SQL's equivalent of `SELECT ... FOR UPDATE` is `WITH (UPDLOCK, HOLDLOCK)`.
@@ -159,7 +159,7 @@ Under `REPEATABLE READ`, this can still happen because that level only locks the
 
 ## Summary
 
-Isolation levels are a spectrum from "fast but anomaly-prone" (Read Uncommitted) to "fully consistent but maximally blocking" (Serializable), implemented either through locks that make transactions wait or through MVCC that gives each reader its own consistent version at the cost of tempdb space. The two facts most worth memorising cold are that lost updates need an explicit update lock or an atomic statement regardless of isolation level, and that RCSI and Snapshot isolation solve overlapping but distinct problems — per-statement versus per-transaction consistency — with different failure modes (silent staleness versus an explicit conflict error) for the application to handle.
+Isolation levels are a spectrum from "fast but anomaly-prone" (Read Uncommitted) to "fully consistent but maximally blocking" (Serializable), implemented either through locks that make transactions wait or through MVCC that gives each reader its own consistent version at the cost of tempdb space. The two facts most worth memorising cold are that read-compute-write logic under Read Committed still needs an explicit update lock or, better, a single atomic `UPDATE`, and that RCSI and Snapshot isolation solve overlapping but distinct problems — per-statement versus per-transaction consistency — with different failure modes (silent staleness versus an explicit conflict/retry path) for the application to handle.
 
 ## Top Interview Questions
 
@@ -169,7 +169,7 @@ Read Uncommitted prevents nothing — it allows dirty reads, non-repeatable read
 
 ### Q2. What is a lost update, and does raising the isolation level alone fix it?
 
-A lost update happens when two transactions both read the same row, each computes a new value based on that (now potentially stale) read, and both write back — whichever commits second overwrites the first's change with no awareness it ever happened. Raising isolation level alone does not reliably fix this: even `REPEATABLE READ` only guarantees a value won't change *if read again* within the same transaction, but plain `SELECT`s take shared locks that don't prevent a *different* transaction from also reading and later writing the same row. The real fixes are taking an explicit update lock (`WITH (UPDLOCK, HOLDLOCK)`) at read time, or better, expressing the operation as a single atomic statement (`UPDATE t SET qty = qty - 1 WHERE ...`) so there's no separate read step to go stale.
+A lost update happens when two transactions both read the same row, each computes a new value from that stale read, and both write back — the later write overwrites the earlier one. Plain Read Committed allows this pattern because the shared read lock is released immediately after the `SELECT`. Higher lock-based levels such as Repeatable Read/Serializable prevent the **silent** overwrite by holding shared/range locks until commit; in SQL Server that often turns two read-then-update transactions into blocking and possibly a conversion deadlock, so one transaction is aborted rather than lost. The practical fixes are still explicit: take an update lock (`WITH (UPDLOCK, HOLDLOCK)`) before computing, or better, express the operation as one atomic statement (`UPDATE t SET qty = qty - 1 WHERE ...`) so there is no stale read step.
 
 ### Q3. What's the difference between REPEATABLE READ and SERIALIZABLE?
 

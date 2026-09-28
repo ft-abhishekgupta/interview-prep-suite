@@ -25,6 +25,8 @@ public async Task ProcessItemsAsync(IEnumerable<Item> items, CancellationToken t
 > [!KEY]
 > Cancellation is a request, not a command. If your code never checks the token — inside a tight CPU loop, or by ignoring the token parameter on an API call — cancellation silently does nothing.
 
+`TaskCanceledException` is not a separate cancellation concept; it derives from `OperationCanceledException` and is commonly thrown by task-based APIs (for example, a canceled `Task.Delay` or some `HttpClient` timeout/cancellation paths). Catch `OperationCanceledException` when you mean "the operation was cancelled", and check the relevant token (`callerToken.IsCancellationRequested`, `timeoutCts.IsCancellationRequested`) if you need to distinguish caller cancellation from your own timeout.
+
 ### Linked tokens and timeouts
 
 `CancellationTokenSource.CreateLinkedTokenSource` combines multiple sources so that cancelling *any* of them cancels the linked token — useful for "cancel if the caller cancels **or** a timeout elapses":
@@ -47,7 +49,7 @@ await CallDownstreamAsync(linkedCts.Token);
 | `Task.WhenAll(tasks)` | A `Task` that completes when **all** finish | No — awaitable | Throws the **first** exception on await; all exceptions available via `Task.Exception` (`AggregateException`) |
 | `Task.WhenAny(tasks)` | A `Task<Task>` that completes when **one** finishes | No — awaitable | The winning task's exception only; others are unobserved unless you also await them |
 | `Task.WaitAll(tasks)` | `void` | **Yes**, blocks | Throws `AggregateException` with all failures |
-| `Task.WaitAny(tasks)` | `int` (index) | **Yes**, blocks | Throws only if the *first completed* task faulted |
+| `Task.WaitAny(tasks)` | `int` (index) | **Yes**, blocks | Returns the first completed task's index; inspect or await that task to observe its exception/cancellation |
 
 ```csharp
 var results = await Task.WhenAll(FetchAsync(1), FetchAsync(2), FetchAsync(3));
@@ -172,6 +174,7 @@ await Parallel.ForEachAsync(orderIds,
 ## Cheat sheet
 
 - Cancellation is cooperative — code must check the token or pass it to APIs that do.
+- `TaskCanceledException` derives from `OperationCanceledException`; catch the base type for normal cancellation paths.
 - `CreateLinkedTokenSource` combines a caller's token with a timeout token.
 - `WhenAll` waits for everything and surfaces only the first exception on await; check `.Exception` for the rest.
 - `WaitAll`/`WaitAny`/`.Result`/`.Wait()` block the calling thread — avoid in async code.

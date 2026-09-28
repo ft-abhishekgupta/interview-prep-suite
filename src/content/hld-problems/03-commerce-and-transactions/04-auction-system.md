@@ -82,11 +82,11 @@ erDiagram
     }
 ```
 
-`Auction.current_highest_bid` is a deliberately denormalized field: rather than aggregating the `Bid` table on every read, the auction row caches the winning amount so a viewer's read is a single-row lookup. Every bid write has to update this cached value and insert the `Bid` row consistently — which is exactly the problem the first deep dive below solves.
+`Auction.current_highest_bid` is a deliberately denormalized field: rather than aggregating the `Bid` table on every read, the auction row caches the winning amount so a viewer's read is a single-row lookup. Every bid write has to update this cached value and insert the `Bid` row consistently, so bid acceptance is the correctness-critical transaction in the design.
 
 ## API design
 
-```
+```http
 POST /auctions -> Auction & Item
 {
     item: Item,
@@ -122,9 +122,9 @@ flowchart LR
 ```
 
 1. A seller creates an auction; the auction service persists the `Item` and `Auction` rows and sets `status: active`.
-2. A buyer submits a bid; the bid service validates it against the current highest bid under concurrency control (see the deep dive below), and only if it's strictly higher does it get accepted.
-3. On acceptance, the bid service durably appends the bid to a message queue before acknowledging the client, so the write is never lost even if a downstream step fails.
-4. A notification worker consumes the queue, updates the cached `current_highest_bid` on the auction, and publishes the new highest bid to a pub/sub topic for that auction.
+2. A buyer submits a bid; the bid service validates it against the current highest bid under row locking or optimistic concurrency control, and only if it's strictly higher does it get accepted.
+3. On acceptance, the bid service inserts the `Bid` row and updates the auction's cached `current_highest_bid` in the same database transaction, also writing an outbox event for downstream notification.
+4. A notification worker reads the outbox/queue and publishes the new highest bid to a pub/sub topic for that auction; it never decides the winner itself.
 5. Every viewer with an open SSE connection to that auction's topic receives the updated highest bid within moments, without needing to refresh or poll.
 
 ### Users should be able to post an item for auction with a starting price and end date
@@ -158,9 +158,33 @@ Two bids arriving at nearly the same instant must not both be accepted as the ne
 > [!KEY]
 > OCC is generally the better default: most auctions aren't contended bid-by-bid at the microsecond level, so the retry path is rarely exercised, and it avoids holding a lock (and the associated blocking) for the common case. Pessimistic locking earns its keep specifically on the last seconds of a hot auction, where genuine simultaneous bids are likely.
 
+The accepted-bid write must update the cached winner and insert the bid atomically:
+
+```sql
+-- optimistic form, inside one transaction
+UPDATE auctions
+SET current_highest_bid = :amount,
+    current_highest_bidder_id = :bidder_id,
+    version = version + 1
+WHERE auction_id = :auction_id
+  AND status = 'active'
+  AND end_date > now()
+  AND :amount > current_highest_bid
+  AND version = :expected_version;
+
+-- only if exactly one row was updated:
+INSERT INTO bids (bid_id, auction_id, bidder_id, amount, created_at)
+VALUES (:bid_id, :auction_id, :bidder_id, :amount, now());
+
+INSERT INTO outbox_events (event_type, aggregate_id, payload)
+VALUES ('bid.accepted', :auction_id, :payload);
+```
+
+If the update affects zero rows, the bid lost the race or was too low. This is the invariant-preserving step; Kafka/pub-sub only spreads the result to readers.
+
 ## Deep dive: fault tolerance and durability
 
-A bid that a buyer believes was accepted must never silently disappear, even if the notification path or downstream consumer fails. Writing every accepted bid through a **message queue** before considering it fully processed gives three properties at once: durable storage of the bid event, a buffer that absorbs bursts (like the closing-seconds sniping spike), and ordering per auction. Kafka fits well here specifically because it offers high throughput, durability, and partitioning — bids for a given `auction_id` can be routed to the same partition, preserving order for that auction without needing global ordering across all auctions.
+A bid that a buyer believes was accepted must never silently disappear, even if the notification path or downstream consumer fails. The source-of-truth durability is the database transaction that updates the auction row, inserts the bid, and writes an outbox event. A queue such as Kafka then gives three downstream properties: durable delivery of the notification event, buffering for bursts (like the closing-seconds sniping spike), and ordering per auction. Kafka fits well here specifically because it offers high throughput, durability, and partitioning — events for a given `auction_id` can be routed to the same partition, preserving order for that auction without needing global ordering across all auctions.
 
 ![alt text](notes/HLD/Problems/Auction/image-9.png)
 
@@ -192,14 +216,14 @@ With 10M auctions live at once, and each one having its own stream of highest-bi
 |---|---|---|
 | Message queue partition down | Bids for auctions on that partition delayed | Kafka replication keeps the partition durable; bid service retries once the partition recovers |
 | Notification worker down | Highest-bid updates stop propagating to viewers | Queue buffers events; SSE clients briefly see a stale highest bid, backfilled once the worker recovers |
-| Bid service instance crash mid-write | A single in-flight bid may need retry | Client retries with an idempotency key; message queue ensures the accepted bid, once durably written, isn't lost |
+| Bid service instance crash mid-write | A single in-flight bid may need retry | Client retries with an idempotency key; the DB transaction/outbox boundary ensures an accepted bid and its notification event commit together or not at all |
 | Pub/sub outage | Real-time updates stop; viewers see stale highest bid | Fall back to client-side polling of `GET /auctions/:auctionId` until pub/sub recovers |
 
 ## Cheat sheet
 
 - Cache the current highest bid on the auction row; don't aggregate the bid table on every read.
 - Optimistic concurrency control by default; pessimistic locking for auctions with genuinely high bid contention near closing time.
-- Route every accepted bid through a durable, partitioned message queue (Kafka) before considering it processed — this is what makes the system fault tolerant, not just consistent.
+- Commit every accepted bid with an atomic auction-row update, bid insert, and outbox event; Kafka then delivers the accepted-bid event to viewers without owning correctness.
 - SSE for real-time highest-bid push; plain polling is an acceptable fallback and a reasonable starting point.
 - Pub/sub decouples "which instance processed a bid" from "which instance holds the viewer's connection" — essential once you have far more auctions than any one instance can track.
 - Partition the queue and connections by `auction_id` so one hot auction never blocks others.
@@ -209,14 +233,14 @@ With 10M auctions live at once, and each one having its own stream of highest-bi
 | Mistake | Fix |
 |---|---|
 | Checking and updating the highest bid without any concurrency control | Use pessimistic locking or OCC; otherwise two simultaneous bids can both appear to win |
-| Treating the message queue as optional "just for notifications" | It's the durability mechanism — a bid isn't safely accepted until it's durably queued |
+| Letting a notification worker update the highest bid asynchronously | The bid acceptance transaction must update `Auction.current_highest_bid`; the queue only publishes the already-accepted result |
 | Always using pessimistic locking everywhere | Default to OCC; it avoids blocking for the vast majority of auctions that aren't heavily contended |
 | Having the processing instance push updates directly to all viewers | Use pub/sub so any instance can process a bid and any instance can serve the relevant viewers |
 | Provisioning real-time infrastructure uniformly across all 10M auctions | Most auctions have near-zero concurrent viewers; scale connection capacity to where the traffic actually is |
 
 ## Summary
 
-An auction system's hard problem is protecting a single number — the current highest bid — under real concurrency, while still broadcasting that number to viewers in real time at massive scale. Optimistic concurrency control (with pessimistic locking as an escape valve for hot auctions) keeps bid acceptance correct; routing every accepted bid through a durable, partitioned message queue makes the system fault tolerant; and pub/sub decouples bid processing from viewer notification so both scale independently across 10M concurrent auctions. SSE, not polling, is what makes the highest bid feel live once that pipeline is in place.
+An auction system's hard problem is protecting a single number — the current highest bid — under real concurrency, while still broadcasting that number to viewers in real time at massive scale. Optimistic concurrency control (with pessimistic locking as an escape valve for hot auctions) keeps bid acceptance correct; a transactional outbox plus durable queue makes accepted-bid notifications fault tolerant; and pub/sub decouples bid processing from viewer notification so both scale independently across 10M concurrent auctions. SSE, not polling, is what makes the highest bid feel live once that pipeline is in place.
 
 ## Top Interview Questions
 
@@ -230,7 +254,7 @@ OCC is the better default because most auctions aren't contended bid-by-bid — 
 
 ### Q3. Why route accepted bids through a message queue instead of just writing directly to the database and returning?
 
-A message queue like Kafka provides durable storage, a buffer against bursts, and per-key ordering. Writing the bid event to the queue before considering it processed means the bid survives even if a downstream step (like updating the cached highest bid or notifying viewers) temporarily fails — the event is retried from the queue rather than lost. Kafka in particular partitions well by `auction_id`, preserving strict ordering of bids within one auction without requiring a single global ordering across all auctions, which would be a scalability bottleneck.
+A queue like Kafka provides durable downstream delivery, a buffer against bursts, and per-key ordering, but it should not be the component that decides the winning bid. The bid is accepted only when the database transaction updates `Auction.current_highest_bid`, inserts the `Bid`, and writes an outbox event. Kafka then carries that accepted-bid event to notification workers and SSE gateways; if they fail, the event is retried from the queue rather than lost. Partitioning by `auction_id` preserves ordering of notifications within one auction without requiring a single global ordering across all auctions, which would be a scalability bottleneck.
 
 ### Q4. Why is SSE preferred over WebSockets for showing the live highest bid?
 
@@ -250,7 +274,7 @@ Auction view requests vastly outnumber bid submissions (the read:write ratio her
 
 ### Q8. How would you handle a burst of bids in the final seconds of a popular auction ("sniping")?
 
-This is the scenario where the message queue's buffering matters most: bids arrive faster than they might otherwise be processed, and the queue absorbs the burst without dropping any, processing them in order for that auction's partition. It's also the scenario where switching that specific auction from optimistic to pessimistic concurrency control pays off, since genuine simultaneous bids are likely enough that OCC's retry loop would otherwise thrash rather than making progress.
+This is the scenario where buffering and adaptive concurrency control both matter: bid requests arrive faster than they can all win, so the service should shed clearly stale/too-low bids quickly, while the accepted-bid outbox/queue absorbs the notification burst without dropping updates. It's also the scenario where switching that specific auction from optimistic to pessimistic concurrency control pays off, since genuine simultaneous bids are likely enough that OCC's retry loop would otherwise thrash rather than making progress.
 
 ### Q9. Why is Kafka specifically well-suited to this use case compared to a simpler queue?
 

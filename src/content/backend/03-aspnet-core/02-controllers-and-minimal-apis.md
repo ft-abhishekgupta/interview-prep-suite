@@ -91,7 +91,7 @@ Minimal APIs use similar inference: complex types are bound from the body by def
 
 ## Action results and IResult
 
-Controllers return `IActionResult` (or `ActionResult<T>` for strongly-typed responses with implicit conversion), produced via helpers like `Ok()`, `NotFound()`, `BadRequest()`, `CreatedAtAction()`. Minimal APIs return `IResult`, produced via the `Results` static class (`Results.Ok()`, `Results.NotFound()`, `Results.Created()`) or, since .NET 8, `TypedResults` for compile-time-checked, OpenAPI-friendly variants.
+Controllers return `IActionResult` (or `ActionResult<T>` for strongly-typed responses with implicit conversion), produced via helpers like `Ok()`, `NotFound()`, `BadRequest()`, `CreatedAtAction()`. Minimal APIs return `IResult`, produced via the `Results` static class (`Results.Ok()`, `Results.NotFound()`, `Results.Created()`) or `TypedResults` (introduced in .NET 7) for compile-time-checked, OpenAPI-friendly variants.
 
 ```csharp
 // TypedResults gives you a concrete type the OpenAPI generator can describe precisely
@@ -109,7 +109,7 @@ app.MapPost("/api/orders", async (CreateOrderRequest req, IOrderService orders) 
 Decorating a controller with `[ApiController]` turns on several conventions at once:
 
 - **Automatic 400 response** — if model validation fails (via data annotations), the framework short-circuits with a `400 Bad Request` and a `ValidationProblemDetails` body before your action method even runs.
-- **Binding source inference** — as described above, removing the need for `[FromBody]`/`[FromQuery]` in most cases.
+- **Binding source inference** — complex types come from the body, route-matched simple types from the route, and other simple types from query, removing many `[FromBody]`/`[FromQuery]` attributes.
 - **Multipart/form-data inference** for `IFormFile` parameters.
 - **Problem details for non-success status codes**, using RFC 7807 shape.
 

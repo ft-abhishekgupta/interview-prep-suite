@@ -9,7 +9,7 @@ Dynamic programming is not a separate universe of algorithms — it is brute-for
 
 ## Overlapping subproblems and optimal substructure
 
-DP applies when a problem has both properties below. Miss either one and DP either doesn't help or gives a wrong answer.
+DP applies when a problem has both of these properties. Miss either one and DP either doesn't help or gives a wrong answer.
 
 | Property | Meaning | Test |
 |---|---|---|
@@ -103,7 +103,7 @@ public long fibTab(int n) {
 
 ## Space optimisation: from O(n) to O(1)
 
-If `dp[i]` only depends on a fixed number of previous entries (not the whole history), you don't need the array at all — just keep those few variables, as in the `ClimbStairs` example above. For 2-D DP where `dp[i][j]` only depends on row `i - 1`, you can drop an `O(n·m)` table to `O(m)` by keeping just the previous row (and updating it in place, carefully, if the transition allows).
+If `dp[i]` only depends on a fixed number of previous entries (not the whole history), you don't need the array at all — just keep those few variables, as in a climbing-stairs recurrence. For 2-D DP where `dp[i][j]` only depends on row `i - 1`, you can drop an `O(n·m)` table to `O(m)` by keeping just the previous row (and updating it in place, carefully, if the transition allows).
 
 | DP shape | Naive space | Optimised space | Condition |
 |---|---|---|---|
@@ -113,6 +113,10 @@ If `dp[i]` only depends on a fixed number of previous entries (not the whole his
 
 > [!WARNING]
 > Space-optimising 0/1 knapsack requires iterating the capacity dimension **backwards** (`W` down to `weight`) so each item is only used once per row. Iterating forwards silently turns it into the *unbounded* knapsack — a subtle, hard-to-spot bug.
+
+## State minimality
+
+A DP state should contain everything that affects future choices, but nothing irrelevant. Leaving out a parameter gives wrong cache hits; adding unnecessary parameters explodes the table. For example, in knapsack the future depends on which item index you are considering and how much capacity remains, not on the exact list of items already chosen. In a path-counting grid, the future depends on the current cell, not on the full path used to reach it unless the problem has a visited-cell constraint. When a memoised solution is still too slow, revisit the state definition before blaming the language or the cache implementation.
 
 ## Worked examples
 

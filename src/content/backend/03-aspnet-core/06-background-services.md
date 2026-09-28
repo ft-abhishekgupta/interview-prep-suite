@@ -89,7 +89,7 @@ public class ReportService : BackgroundService
 
 ## Periodic work with PeriodicTimer
 
-`PeriodicTimer` (since .NET 6) is preferred over `Task.Delay` loops or the older `System.Timers.Timer` for periodic work — it avoids overlapping ticks if one iteration runs long, and integrates cleanly with cancellation.
+`PeriodicTimer` (since .NET 6) is preferred for periodic async work because it gives a clear tick-based loop, integrates cleanly with cancellation, and does not queue overlapping callbacks when one iteration runs long. A simple `while` loop with `Task.Delay` after the work is also non-overlapping, but it drifts because the delay starts after each run finishes; callback timers such as `System.Timers.Timer` are the ones that most often overlap if the callback is slower than the period.
 
 ```csharp
 protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -102,7 +102,7 @@ protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 }
 ```
 
-If `RunOnceAsync` takes longer than the period, `PeriodicTimer` simply waits for the next tick after it finishes rather than queuing up bursts of overlapping runs — a real problem with naive `Task.Delay(period)` loops that measure the delay from the *start* of the previous iteration.
+If `RunOnceAsync` takes longer than the period, `PeriodicTimer` does not queue a burst of catch-up executions; the next `WaitForNextTickAsync` completes on the next available tick. That makes overrun behavior explicit without the reentrancy risk of callback-based timers.
 
 ## Web app vs separate worker process
 

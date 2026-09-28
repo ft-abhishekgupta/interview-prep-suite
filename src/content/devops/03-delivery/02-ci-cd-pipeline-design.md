@@ -5,7 +5,7 @@ difficulty: Core
 tags: [ci-cd, pipelines, devops, release-engineering]
 ---
 
-A CI/CD pipeline is a risk-reduction machine, not a formality — every stage exists to catch a specific class of problem as cheaply and early as possible. This page covers pipeline shape, the "build once, promote everywhere" principle that most junior pipelines get wrong, secrets and identity in automation, and the practices (trunk-based development, flaky test quarantine, DORA metrics) that come up constantly in senior interviews.
+A CI/CD pipeline is a risk-reduction machine, not a formality — every stage exists to catch a specific class of problem as cheaply and early as possible. The core topics are pipeline shape, the "build once, promote everywhere" principle that most junior pipelines get wrong, secrets and identity in automation, and the practices (trunk-based development, flaky test quarantine, DORA metrics) that come up constantly in senior interviews.
 
 ## Stages of a good pipeline
 

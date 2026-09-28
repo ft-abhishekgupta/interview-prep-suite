@@ -56,6 +56,13 @@ flowchart LR
 > [!TIP]
 > Event-carried state transfer is the most common practical choice: it avoids the "call back to the source for details" round trip of event notification (which reintroduces synchronous coupling) without committing to full event sourcing's much bigger architectural shift.
 
+Choreographed end to end, the API server's only job is to append the order to the event store. Independent worker pools subscribe to the topics they care about and publish their own events back, so adding an email worker or a shipping worker requires no change to the write path.
+
+![Choreographed order flow where an API server writes to an event store with order, payment, inventory and shipping topics consumed by independent worker pools](notes/05-HighLevelDesign/DistributedSystems/image-1.png)
+
+> [!WARNING]
+> Choreography like this is easy to extend and hard to debug. With no central coordinator, "where did order 123 get stuck?" can only be answered from correlation IDs and distributed traces. Add them before you need them, not after the first incident.
+
 ## CQRS: separate read and write models
 
 CQRS (Command Query Responsibility Segregation) splits the model used to **write** data from the model used to **read** it — instead of one entity class/table serving both a normalized write path and a denormalized, query-optimized read path.

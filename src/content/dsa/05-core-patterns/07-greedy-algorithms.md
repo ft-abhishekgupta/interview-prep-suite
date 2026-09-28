@@ -112,7 +112,7 @@ public int leastInterval(char[] tasks, int n) {
 }
 ```
 
-The greedy idea: always schedule the currently most-frequent remaining task first (conceptually — a max-heap simulation gives the same answer), so no idle slot is ever wasted while a schedulable task exists. The closed-form above is the compressed result of that simulation.
+The greedy idea: always schedule the currently most-frequent remaining task first (conceptually — a max-heap simulation gives the same answer), so no idle slot is ever wasted while a schedulable task exists. The closed-form formula is the compressed result of that simulation.
 
 ## Coin change: where greedy fails
 
@@ -210,11 +210,11 @@ First check for optimal substructure — can the problem be broken into subprobl
 
 ### Q8. Debugging scenario: your Jump Game solution returns false for an input where a valid path clearly exists. What's the likely bug?
 
-The most common bug is checking `i > farthest` at the wrong point relative to updating `farthest`, or initialising `farthest` incorrectly (it should start at `0`, representing "we can currently stand at index 0"). If the check `if (i > farthest) return false;` happens *after* updating `farthest` for the current index instead of before, you might incorrectly allow index `i` to update `farthest` even though you could never have legitimately reached `i` in the first place, silently propagating an invalid reach forward. The fix is to check reachability of the *current* index first, using the farthest value computed from all *previous* indices, and only then extend `farthest` using the current index's jump length.
+The most common false-negative bug is using `if (i >= farthest) return false` instead of `if (i > farthest) return false`. Being exactly at the farthest reachable index is still valid — you are standing there and may be able to extend the frontier with `i + nums[i]`. Another common bug is initialising `farthest` incorrectly; it should start at `0`, representing "we can currently stand at index 0". The fix is to check reachability of the *current* index first with the strict `>` test, then extend `farthest` using the current index's jump length.
 
 ### Q9. Can Task Scheduler's answer ever be smaller than the total number of tasks? Why does the formula account for this?
 
-No — you can never finish executing all tasks in less time than the number of tasks itself, since each task occupies at least one time unit, even if there's no idle time at all between any of them (which happens when there are enough distinct tasks to fill every cooldown gap). The formula `(maxFreq - 1) * (n + 1) + maxCount` computes the schedule length assuming idle slots *might* be needed around the most frequent task, but if there are enough other distinct tasks to fill those gaps, the actual required time collapses down to just `totalTasks` — potentially smaller than the formula's raw value in cases with few repeats. Taking `max(totalTasks, formula)` correctly picks whichever bound is actually binding.
+No — you can never finish executing all tasks in less time than the number of tasks itself, since each task occupies at least one time unit, even if there's no idle time at all between any of them (which happens when there are enough distinct tasks to fill every cooldown gap). The formula `(maxFreq - 1) * (n + 1) + maxCount` computes the length forced by the most frequent task family and its cooldown gaps, but when there are many other tasks, the raw task count can be larger because those tasks fill every idle slot and add extra occupied slots. Taking `max(totalTasks, formula)` correctly picks whichever lower bound is actually binding.
 
 ### Q10. In a production job-scheduling system, when would a greedy heuristic be an acceptable substitute for an exact optimal (possibly DP-based) algorithm?
 

@@ -83,7 +83,7 @@ G1 divides the heap into equal **regions** (typically 1–32 MB) that are dynami
 
 ### ZGC and Shenandoah
 
-These are **concurrent** collectors that do almost all work while the application runs, keeping pauses sub-millisecond (ZGC) or single-digit-millisecond (Shenandoah) regardless of heap size. They rely on **load/read barriers** and **coloured pointers** (metadata bits in the reference) to relocate objects concurrently without stopping the application. The trade-off is a **throughput cost** — the barriers add per-access overhead — and slightly higher CPU and memory use. **Generational ZGC** (JDK 21) restores the young/old split to ZGC, dramatically cutting its CPU and allocation-stall cost for typical workloads.
+These are **concurrent** collectors that do almost all work while the application runs, keeping pauses sub-millisecond (ZGC) or single-digit-millisecond (Shenandoah) regardless of heap size. They rely on **load/read barriers** to relocate objects concurrently without stopping the application: ZGC uses coloured pointers (metadata bits in references), while Shenandoah uses forwarding metadata and barriers rather than the same pointer-colouring scheme. The trade-off is a **throughput cost** — the barriers add per-access overhead — and slightly higher CPU and memory use. **Generational ZGC** (JDK 21) restores the young/old split to ZGC, dramatically cutting its CPU and allocation-stall cost for typical workloads.
 
 ```bash
 java -XX:+UseG1GC        -Xms4g -Xmx4g -jar app.jar     # default, balanced
@@ -181,7 +181,7 @@ G1 splits the heap into equal-sized regions dynamically labelled Eden, survivor 
 
 ### Q6. How do ZGC and Shenandoah achieve sub-millisecond pauses, and what's the cost?
 
-They do nearly all their work — marking and relocation — concurrently with the application, so the stop-the-world portion is tiny and roughly constant regardless of heap size. The enabling trick is coloured pointers plus load/read barriers: metadata bits stored in the reference let the collector relocate an object while the application runs, and a barrier on each reference load fixes up pointers to moved objects transparently. The cost is throughput: those barriers add per-access overhead, and the collectors use more CPU and some extra memory. ZGC historically was single-generation, which raised its CPU cost; generational ZGC in JDK 21 adds the young/old split back, greatly reducing that overhead for typical allocation-heavy workloads while keeping the ultra-low pauses.
+They do nearly all their work — marking and relocation — concurrently with the application, so the stop-the-world portion is tiny and roughly constant regardless of heap size. The enabling trick is barriers on reference access: ZGC combines load barriers with coloured pointers, while Shenandoah uses read/load barriers plus forwarding metadata to fix references to moved objects transparently. The cost is throughput: those barriers add per-access overhead, and the collectors use more CPU and some extra memory. ZGC historically was single-generation, which raised its CPU cost; generational ZGC in JDK 21 adds the young/old split back, greatly reducing that overhead for typical allocation-heavy workloads while keeping the ultra-low pauses.
 
 ### Q7. What is a safepoint, and how can a GC pause be long even when the collector is fast?
 

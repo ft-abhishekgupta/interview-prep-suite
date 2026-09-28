@@ -73,7 +73,7 @@ Comments are append-only and partitioned by `live_video_id`, which is also the n
 
 ## API design
 
-```
+```http
 POST /comments/:liveVideoId
 Header: JWT | SessionToken
 {
@@ -101,7 +101,7 @@ flowchart LR
     CDN --> C
 ```
 
-1. A viewer opens a live video and establishes a subscription — an SSE connection for normal-scale streams, or a CDN pull loop for mega-streams (see the deep dives below).
+1. A viewer opens a live video and establishes a subscription — an SSE connection for normal-scale streams, or a CDN pull loop for mega-streams whose comment rate is too high for per-comment push.
 2. A viewer posts a comment; the comment service writes it to the comment store and publishes it to that video's pub/sub topic.
 3. The dispatcher service consumes the topic and pushes the new comment to every SSE gateway instance holding connections for that video.
 4. In parallel, a snapshot worker periodically bundles the latest comments for high-traffic videos and pushes them to the CDN, so viewers on that tier pull from an edge cache instead of holding a direct connection to backend infrastructure.

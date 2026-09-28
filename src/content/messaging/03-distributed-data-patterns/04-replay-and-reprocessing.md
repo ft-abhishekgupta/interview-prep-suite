@@ -17,7 +17,7 @@ Replay is deliberately re-feeding events that were already produced — sometime
 | A data correction is needed | An upstream data error is fixed at the source, and downstream state must reflect the fix |
 
 > [!KEY]
-> Replay only works if the events are still available and consumers can safely process the same event more than once. Everything else in this page follows from those two requirements.
+> Replay only works if the events are still available and consumers can safely process the same event more than once. Every safe replay practice follows from those two requirements.
 
 ## Offsets and retention: the enabler
 

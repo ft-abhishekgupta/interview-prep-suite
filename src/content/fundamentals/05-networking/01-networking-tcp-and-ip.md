@@ -94,7 +94,7 @@ IPv4 and IPv6 solve the same problem — uniquely identifying a host — but dif
 | Address space | ~4.3 billion | ~3.4 × 10^38 |
 | Header | Variable, 20–60 bytes | Fixed, 40 bytes |
 | Fragmentation | Routers and hosts can fragment | Only the source host fragments |
-| Security | IPsec optional | IPsec built into the standard |
+| Security | IPsec optional | IPsec support is standardized, but encryption is not automatic |
 
 ![alt text](notes/02-ComputerNetworks/image-11.png)
 
@@ -202,7 +202,7 @@ Two related failure states are worth being able to name on sight: a **half-open 
 
 ## MTU and fragmentation
 
-The **MTU (maximum transmission unit)** is the largest packet a link can carry without fragmenting — commonly 1500 bytes on Ethernet. If a packet exceeds the path's smallest MTU, it's either fragmented into smaller pieces (each with its own header overhead, and if any single fragment is lost, the *entire* original packet must be retransmitted) or, for IPv6 and when the "don't fragment" flag is set, rejected outright with an ICMP error, requiring the sender to shrink its packet size. **Path MTU discovery** finds the smallest MTU along a route so senders can avoid fragmentation up front.
+The **MTU (maximum transmission unit)** is the largest IP packet a link can carry without fragmenting — commonly 1500 bytes on Ethernet. TCP's **MSS (maximum segment size)** is the largest TCP payload that fits inside that MTU after subtracting IP and TCP headers, so a 1500-byte Ethernet MTU usually means an MSS around 1460 bytes for IPv4 without options. If a packet exceeds the path's smallest MTU, it's either fragmented into smaller pieces (each with its own header overhead, and if any single fragment is lost, the receiver discards the whole original packet and the transport/application must resend) or, for IPv6 and when the "don't fragment" flag is set, rejected with an ICMP Packet Too Big error, requiring the sender to shrink its packet size. **Path MTU discovery** finds the smallest MTU along a route so senders can avoid fragmentation up front.
 
 A VPN or any other tunnelling layer makes this concrete: it wraps the original packet inside a new outer packet with its own headers, encrypting the payload in the process, which eats into the space available before the path's MTU is exceeded — a client still sending at the untouched 1500-byte assumption over a tunnel can start fragmenting, or silently dropping packets, purely because of the tunnel's added overhead.
 

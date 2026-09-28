@@ -23,7 +23,7 @@ op = Multiply;
 Console.WriteLine(op(2, 3));      // 6
 ```
 
-Unlike a raw C function pointer, a delegate carries the method's signature (checked at compile time), can wrap an instance method (bundling the target object alongside the method pointer), and can point to more than one method at once (multicast, below).
+Unlike a raw C function pointer, a delegate carries the method's signature (checked at compile time), can wrap an instance method (bundling the target object alongside the method pointer), and can point to more than one method at once (multicast invocation lists).
 
 ## Func, Action, Predicate
 
@@ -111,18 +111,29 @@ The `EventHandler<TEventArgs>(object? sender, TEventArgs e)` shape is a .NET-wid
 
 ## Closures and the captured-variable trap in loops
 
-A lambda captures **variables**, not their values at the moment of capture — historically, this meant a `for` loop's iteration variable, being reused across iterations, was captured once and reflected its *final* value in every closure.
+A lambda captures **variables**, not their values at the moment of capture. That rule still matters most in loops: a `for` loop's iteration variable is one variable reused across iterations, while `foreach` iteration variables are fresh per iteration in modern C#.
 
 ```csharp
-// C# 5+ (current behavior) — each iteration gets its own variable, this works correctly
+// Still a trap: for-loop captures the same i variable
 var actions = new List<Action>();
 for (int i = 0; i < 3; i++)
     actions.Add(() => Console.WriteLine(i));
-foreach (var a in actions) a();     // prints 0, 1, 2
+foreach (var a in actions) a();     // prints 3, 3, 3
 
-// foreach always captured a fresh variable per iteration, even before C# 5
+// Fix: copy to a fresh local inside the loop body
+var fixedActions = new List<Action>();
+for (int i = 0; i < 3; i++)
+{
+    int copy = i;
+    fixedActions.Add(() => Console.WriteLine(copy));
+}
+foreach (var a in fixedActions) a(); // prints 0, 1, 2
+
+// foreach iteration variables are fresh per iteration in C# 5+
+var foreachActions = new List<Action>();
 foreach (var item in new[] { "a", "b", "c" })
-    actions.Add(() => Console.WriteLine(item));  // safe in all C# versions
+    foreachActions.Add(() => Console.WriteLine(item));
+foreach (var a in foreachActions) a();           // prints a, b, c
 
 // The trap that STILL exists: a single variable declared OUTSIDE the loop and reused
 var actionsTrap = new List<Action>();
@@ -135,14 +146,14 @@ for (int i = 0; i < 3; i++)
 ```
 
 > [!DANGER]
-> C# 5 changed `for` loop semantics so the loop variable is now scoped fresh per iteration, fixing the classic "all closures print the last value" bug for `for` loops specifically. But the underlying rule — **closures capture the variable, not a snapshot of its value** — is unchanged, and any variable declared outside the loop body and mutated inside it will still exhibit the old trap. This is one of the most reliable "do you actually understand closures" interview questions.
+> C# 5 changed `foreach` capture semantics so each iteration gets a fresh iteration variable. It did **not** change `for` loop capture semantics: a `for` loop variable declared in the header is still one variable captured by every closure. The safe pattern is to declare a fresh local inside the loop body when each closure needs its own value.
 
 ## Lambda vs anonymous method vs local function
 
 | Form | Syntax | Captures variables? | Can be `async`? | Overhead |
 |---|---|---|---|---|
 | Lambda expression | `x => x + 1` | Yes (closure) | Yes (`async x => ...`) | Allocates a delegate, and a closure class if it captures |
-| Anonymous method | `delegate(int x) { return x + 1; }` | Yes (closure) | No | Same as lambda — largely superseded by lambdas |
+| Anonymous method | `delegate(int x) { return x + 1; }` | Yes (closure) | Yes (`async delegate { await ...; }`) | Same as lambda — largely superseded by lambdas |
 | Local function | `int Add1(int x) => x + 1;` | Yes, but the compiler can avoid a heap allocation entirely if it's never converted to a delegate | Yes | Cheapest — can be a plain static-like method with no delegate/closure overhead if not passed as a value |
 
 ```csharp
@@ -180,7 +191,7 @@ If a long-lived publisher (say, a singleton service or a static event) holds a s
 - Delegates are multicast by default; only the last handler's return value survives a direct `Func<T>` call.
 - `event` restricts a delegate field to `+=`/`-=` from outside the class — no external invoke, no external `=` wipeout.
 - Closures capture **variables**, not values — mutating the captured variable after capture changes what the closure sees.
-- `for` loop variables are scoped per-iteration since C# 5; `foreach` always was. A variable declared *outside* the loop is still a trap.
+- `for` loop variables are still one captured variable; copy to a fresh local per iteration. `foreach` variables are fresh per iteration in C# 5+.
 - Prefer local functions over lambdas when the function is never passed around as a value — avoids a delegate/closure allocation.
 - Event subscriptions create a publisher → subscriber reference; forgetting to unsubscribe is a classic memory leak.
 
@@ -197,7 +208,7 @@ If a long-lived publisher (say, a singleton service or a static event) holds a s
 
 ## Summary
 
-Delegates are type-safe, potentially multicast references to methods, and `Func`/`Action`/`Predicate` cover nearly every use case without a custom delegate declaration. Events layer a publish/subscribe discipline on top of a delegate field, so subscribers can only add or remove themselves, never invoke or clear the list — but that same subscription creates a reference back from publisher to subscriber, which is the root cause of the most common event-related memory leak. Closures capture variables, not values, which is why loop-variable capture is a perennial interview trap even though `for` loops have scoped their iteration variable per-iteration since C# 5.
+Delegates are type-safe, potentially multicast references to methods, and `Func`/`Action`/`Predicate` cover nearly every use case without a custom delegate declaration. Events layer a publish/subscribe discipline on top of a delegate field, so subscribers can only add or remove themselves, never invoke or clear the list — but that same subscription creates a reference back from publisher to subscriber, which is the root cause of the most common event-related memory leak. Closures capture variables, not values, which is why loop-variable capture remains a perennial interview trap: `foreach` is safe in modern C#, but `for` still needs an explicit per-iteration copy when closures should remember distinct values.
 
 ## Top Interview Questions
 
@@ -219,7 +230,7 @@ A plain public delegate field gives external code full control over it: any call
 
 ### Q5. Explain the classic "closures in a loop" bug — does it still exist in modern C#?
 
-Historically, in `for (int i = 0; i < n; i++) actions.Add(() => Console.WriteLine(i));`, all lambdas captured the *same* variable `i`, and since the loop reused a single variable across iterations, every closure printed the loop's final value once the loop completed, rather than the value at the time each closure was created. C# 5 changed the language specification so a `for` loop's iteration variable is now a fresh variable scoped to each iteration, which fixed this specific case — the code above now correctly prints 0, 1, 2 in modern C#. `foreach` never had this bug even in older C# versions, since its iteration variable was always scoped per-iteration. The underlying rule that closures capture variables, not value snapshots, is unchanged, though — a variable declared *outside* the loop and merely assigned inside it (`int shared; for(...) { shared = i; actions.Add(() => Print(shared)); }`) still exhibits the "all closures see the final value" behavior today, because there's genuinely only one variable being captured across all iterations.
+Yes, it still exists for `for` loops. In `for (int i = 0; i < n; i++) actions.Add(() => Console.WriteLine(i));`, every lambda captures the same `i` variable, so after the loop finishes they all print the final value. C# 5 fixed the analogous `foreach` trap by making the iteration variable fresh per iteration, but it did not change `for`. The fix is explicit: declare a fresh local inside the loop body (`int copy = i;`) and capture that. The underlying rule is unchanged — closures capture variables, not value snapshots — so any loop-external variable mutated inside a loop will still be shared by every closure.
 
 ### Q6. What's the difference between a lambda expression, an anonymous method, and a local function — and when would you choose a local function?
 

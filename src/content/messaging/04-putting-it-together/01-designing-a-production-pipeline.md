@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [system-design, observability, reliability, capacity-planning, messaging]
 ---
 
-This page pulls together everything from queueing to backpressure to schema evolution into one worked design: a producer publishes to a queue, a consumer processes and writes to a database. It sounds simple until you're asked what happens when the broker goes down at 3am, a message poisons your consumer, or traffic spikes 10x during a sale — which is exactly what a design review interview is testing.
+A production pipeline pulls together queueing, backpressure and schema evolution into one worked design: a producer publishes to a queue, a consumer processes and writes to a database. It sounds simple until you're asked what happens when the broker goes down at 3am, a message poisons your consumer, or traffic spikes 10x during a sale — which is exactly what a design review interview is testing.
 
 ## The full request path
 

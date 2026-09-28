@@ -44,7 +44,7 @@ Java's `HashMap` uses separate chaining (each bucket is a linked list that conve
 | High (> 0.75) | Longer chains; Java treeifies a bucket at 8 entries to cap it at `O(log n)` |
 
 > [!TIP]
-> If you know roughly how many entries you'll insert, construct the `HashMap`/`HashSet` with that capacity (`new HashMap<>(expectedCount)`). This avoids repeated rehashing, the same trick as pre-sizing an `ArrayList`.
+> If you know roughly how many entries you'll insert, pre-size for the resize threshold, not just the entry count: `new HashMap<>((int) (expectedCount / 0.75f) + 1)`. The constructor takes an initial bucket capacity (rounded internally), so using the raw expected count can still resize near the default load factor.
 
 ## HashMap and HashSet in Java
 
@@ -86,6 +86,8 @@ class Point {
 
 Java `record` types generate `equals`, `hashCode` and `toString` from their components automatically, which is one reason to prefer a `record` for a composite map key over a hand-rolled class.
 
+The other senior-level detail is **immutability**. A key's fields must not change while the key is inside a hash table, because the bucket was chosen from the old hash code. If `Point.x` changes after insertion, the object may still physically live in the old bucket while future lookups compute a different bucket and fail. Prefer immutable key types (`record`, final fields, defensive copies) for composite keys.
+
 ## When hashing degrades to O(n)
 
 Hashing's "O(1) average" has a genuine worst case: if every key collides into the same bucket, every operation degrades to `O(n)` — the chain becomes a linear scan (or `O(log n)` once Java treeifies that bucket). This happens when:
@@ -126,7 +128,7 @@ for (String word : words) {
 |---|---|---|
 | Fastest possible lookup, no order needed | `HashMap` / `HashSet` | `O(1)` average |
 | Sorted iteration, still need lookup | `TreeMap` / `TreeSet` | `O(log n)` |
-| Preserve insertion order exactly | `LinkedHashMap` / `LinkedHashSet` | `O(1)` |
+| Preserve insertion order exactly | `LinkedHashMap` / `LinkedHashSet` | `O(1)` average |
 
 ## Cheat sheet
 
@@ -134,7 +136,7 @@ for (String word : words) {
 - Load factor rising too high triggers a resize — an `O(n)` rehash that's amortised away over many inserts.
 - `HashMap`/`HashSet` give `O(1)` **average**, `O(n)` **worst case** (`O(log n)` once Java treeifies a bucket). Always state both.
 - Overriding `equals` without `hashCode` (or vice versa) silently breaks map/set behaviour.
-- Pre-size a `HashMap`/`HashSet` with an expected capacity when you know it, to skip rehashes.
+- Pre-size a `HashMap`/`HashSet` from the expected entry count and load factor when you know it, to skip rehashes.
 - Complement lookup (`target - x` seen already) turns `O(n²)` pair problems into `O(n)`.
 - Use a derived/normalized key (sorted string, tuple) to group related items.
 - Reach for `TreeMap`/`TreeSet` only when you actually need sorted iteration — it costs `O(log n)` instead of `O(1)`.

@@ -284,7 +284,7 @@ Streams shine for readable setup and aggregation — building an array with `Int
 
 ### Q8. How do you build a max-heap given that `PriorityQueue` is a min-heap by default?
 
-Pass a reversed comparator: `new PriorityQueue<>(Comparator.reverseOrder())` for boxed values, or `Comparator.comparingInt(e -> -e.cost)` / `.reversed()` for objects. For a "k largest" problem the trick is often the opposite — keep a **min-heap** of size k and poll whenever it exceeds k, so the smallest of the top-k sits at the root for O(log k) eviction. Remember there is no decrease-key and `remove(Object)` is O(n); to update a priority, push a fresh entry and skip stale ones when polling.
+Pass a reversed comparator: `new PriorityQueue<>(Comparator.reverseOrder())` for boxed values, or `Comparator.comparingInt((Entry e) -> e.cost).reversed()` for objects. Avoid negating priorities (`-e.cost`) because `Integer.MIN_VALUE` overflows when negated. For a "k largest" problem the trick is often the opposite — keep a **min-heap** of size k and poll whenever it exceeds k, so the smallest of the top-k sits at the root for O(log k) eviction. Remember there is no decrease-key and `remove(Object)` is O(n); to update a priority, push a fresh entry and skip stale ones when polling.
 
 ### Q9. What does it mean that `binarySearch` returns a negative number, and how do you use it?
 

@@ -5,7 +5,7 @@ difficulty: Core
 tags: [kubernetes, autoscaling, resource-management, capacity-planning]
 ---
 
-Every container in Kubernetes carries two numbers — requests and limits — and misunderstanding what each one actually does is the single biggest source of both wasted spend and mysterious production incidents. This page covers how the scheduler and kubelet use those numbers, the asymmetry between CPU throttling and memory OOMKill, and the four autoscalers you are expected to reason about: HPA, VPA, KEDA and the cluster autoscaler.
+Every container in Kubernetes carries two numbers — requests and limits — and misunderstanding what each one actually does is the single biggest source of both wasted spend and mysterious production incidents. The important pieces are how the scheduler and kubelet use those numbers, the asymmetry between CPU throttling and memory OOMKill, and the four autoscalers you are expected to reason about: HPA, VPA, KEDA and the cluster autoscaler.
 
 ## Requests and limits do different jobs
 
@@ -29,9 +29,9 @@ This means a bad CPU limit degrades quietly (p99 latency creeps up, nobody pages
 
 | QoS class | Condition | Eviction priority under node pressure |
 |---|---|---|
-| Guaranteed | requests == limits for CPU and memory on every container | Evicted last |
-| Burstable | at least one request set, request < limit | Evicted after BestEffort |
-| BestEffort | no requests or limits set | Evicted first |
+| Guaranteed | every container sets CPU and memory requests and limits, and each request equals its limit | Evicted last |
+| Burstable | at least one CPU/memory request or limit is set, but the Pod is not Guaranteed | Evicted after BestEffort |
+| BestEffort | no CPU or memory requests or limits on any container | Evicted first |
 
 > [!WARNING]
 > Throttling is invisible unless you scrape `container_cpu_cfs_throttled_periods_total`. Teams routinely ship a CPU limit, see nothing in error dashboards, and only find the throttling months later when someone plots p99 latency against it.
@@ -56,7 +56,7 @@ The VPA recommender (run in "Off" mode) is a good source of these numbers even i
 
 The Horizontal Pod Autoscaler polls metrics every sync period (default 15s) and computes:
 
-```
+```text
 desiredReplicas = ceil( currentReplicas × ( currentMetricValue / desiredMetricValue ) )
 ```
 
@@ -220,7 +220,7 @@ Scale-to-zero is fine for internal or asynchronous workloads, but for a customer
 
 ### Q10. What Quality of Service (QoS) class does Kubernetes assign a pod, and why does it matter?
 
-Kubernetes derives QoS from requests/limits without any explicit field: `Guaranteed` if every container's requests equal its limits for both CPU and memory, `Burstable` if at least one request is set but requests and limits differ, and `BestEffort` if neither is set. This matters because QoS class drives eviction order under node memory pressure — BestEffort pods are evicted first, then Burstable, and Guaranteed last. A production-critical pod with no requests/limits set is BestEffort and will be the first thing killed when a node is under memory pressure, regardless of how important the workload actually is.
+Kubernetes derives QoS from requests/limits without any explicit field: `Guaranteed` if every container sets CPU and memory requests and limits and each request equals its corresponding limit, `BestEffort` if no container sets any CPU or memory request or limit, and `Burstable` for everything in between. This matters because QoS class drives eviction order under node memory pressure — BestEffort pods are evicted first, then Burstable, and Guaranteed last. A production-critical pod with no requests/limits set is BestEffort and will be the first thing killed when a node is under memory pressure, regardless of how important the workload actually is.
 
 ### Q11. How would you right-size a fleet of services that were all launched with copy-pasted, guessed resource requests?
 

@@ -42,7 +42,7 @@ flowchart TD
     Head["HEAD"] --> Main
 ```
 
-A **branch** is nothing but a mutable pointer to a commit — creating one is instant because it writes 41 bytes, not a copy of the repository. `HEAD` usually points at a branch (which points at a commit); in **detached HEAD** state it points straight at a commit, which is why commits made there can be lost once you check out something else — they aren't reachable from any branch.
+A **branch** is nothing but a mutable pointer to a commit — creating one is instant because it writes a tiny ref pointing at a commit hash, not a copy of the repository. `HEAD` usually points at a branch (which points at a commit); in **detached HEAD** state it points straight at a commit, which is why commits made there can be lost once you check out something else — they aren't reachable from any branch.
 
 > [!KEY]
 > A commit is immutable and content-addressed by the SHA-1/SHA-256 hash of its tree + parent + metadata. "Rewriting history" never edits a commit — it creates a new commit and moves a ref to point at it. The old commit still exists until garbage collected.
@@ -84,7 +84,7 @@ A `.gitignore` file specifies untracked files and directories Git should ignore,
 
 ## Branching
 
-A branch provides an independent line of development for a feature or fix without affecting the main codebase — creating one, as the object model above shows, is just writing a new 41-byte pointer.
+A branch provides an independent line of development for a feature or fix without affecting the main codebase — creating one is just writing a tiny ref that points at a commit.
 
 ![Git branching](notes/SE/Git/image-2.png){height=100px}
 
@@ -314,7 +314,7 @@ Git's model is four object types and mutable refs pointing at immutable commits 
 
 ### Q1. What are the four core object types in Git, and how do they relate to each other?
 
-Blobs store raw file contents with no filename; trees are directory listings mapping names to blobs or other trees; commits point to a single tree (the project snapshot) plus one or more parent commits, along with author and message metadata; and refs (branches, tags, `HEAD`) are named pointers to a commit. A commit is a snapshot of the entire tree, not a diff — Git computes diffs on demand by comparing trees. Understanding this explains why creating a branch is instant (it's 41 bytes, a pointer) and why commits are immutable and content-addressed by the hash of their contents plus parent.
+Blobs store raw file contents with no filename; trees are directory listings mapping names to blobs or other trees; commits point to a single tree (the project snapshot) plus one or more parent commits, along with author and message metadata; and refs (branches, tags, `HEAD`) are named pointers to a commit. A commit is a snapshot of the entire tree, not a diff — Git computes diffs on demand by comparing trees. Understanding this explains why creating a branch is instant (it's just a tiny ref pointer) and why commits are immutable and content-addressed by the hash of their contents plus parent.
 
 ### Q2. When would you use merge versus rebase, and why is rebase dangerous on shared branches?
 

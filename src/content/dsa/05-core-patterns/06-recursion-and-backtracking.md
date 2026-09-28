@@ -126,7 +126,7 @@ private void backtrack(int[] nums, boolean[] used, List<Integer> current, List<L
 
 ## Combination sum
 
-Elements can be **reused**, so the recursive call doesn't advance past the current index unless you decide not to reuse it — the pruning here is on the running sum, not on a "used" flag.
+Elements can be **reused**, so the recursive call doesn't advance past the current index unless you decide not to reuse it — the pruning here is on the running sum, not on a "used" flag. The usual interview version assumes positive candidate values; zero or negative reusable candidates would need extra constraints to avoid non-terminating recursion.
 
 ```java
 // O(2^target) worst case, O(target / min(candidates)) recursion depth
@@ -249,6 +249,10 @@ boolean canReach(int index, int remaining) {
 ```
 
 This is precisely why "recursion + memoisation" and "dynamic programming" are often described as the same idea approached from opposite directions: DP with a table is backtracking's search tree collapsed onto only the distinct states that actually matter.
+
+## Ordering choices for deterministic output
+
+Many generators have multiple correct output orders, but deterministic traversal still matters for testing and debugging. Sort candidates before duplicate-skipping problems so equal values are adjacent and the `i > start && nums[i] == nums[i-1]` check has a clear meaning. Keep combinations in non-decreasing candidate order when order should not matter; otherwise `[2,3]` and `[3,2]` become duplicate answers produced by different paths. For permutations, do not use a `start` index, because every unused value must remain eligible for the next position. Stating whether order is part of the answer prevents choosing the wrong recursion state.
 
 ## Cheat sheet
 

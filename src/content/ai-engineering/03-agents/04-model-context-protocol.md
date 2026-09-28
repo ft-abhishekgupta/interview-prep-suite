@@ -14,6 +14,10 @@ Without a standard, every AI application that wants to use external tools has to
 > [!KEY]
 > MCP is to tool integration what a database driver interface is to databases — the application code doesn't change per database, and here the agent code doesn't change per tool provider. That reduction from N×M to N+M bespoke pieces of work is the entire value proposition.
 
+In practice one application speaks a single protocol outward to a database, a filesystem, a source-control host, a chat workspace, a mail provider and arbitrary web APIs.
+
+![An AI application connected over MCP to a database, web APIs, GitHub, Slack, Gmail and the local filesystem](notes/AI/image-1.png)
+
 ## Client-Server Architecture
 
 An MCP **host** (the AI application — an IDE, a chat app, an agent runtime) runs one or more MCP **clients**, each maintaining a stateful, one-to-one connection to an MCP **server** — a lightweight process that exposes a specific integration (a filesystem, a database, a SaaS API).
@@ -43,18 +47,21 @@ MCP defines exactly three things a server can offer, and the distinction between
 > [!NOTE]
 > Tools are model-driven (the LLM decides to call one, like function calling), while resources are typically application-driven (the host UI lets a user attach a file or the client fetches it proactively). Prompts are the least-used primitive in practice but matter for exposing curated workflows a server author wants to standardise.
 
+![Model and MCP client in the application talking to an MCP server that exposes tools, resources and prompts](notes/AI/image-2.png)
+
 ## Transports and the Initialisation Handshake
 
 MCP defines two standard transports: **stdio**, where the client launches the server as a local subprocess and communicates over standard input/output — simplest, zero network exposure, ideal for local tools; and **HTTP with Server-Sent Events (SSE)** (or the newer streamable HTTP), for remote servers reachable over a network, supporting multiple concurrent clients.
 
-Every connection starts with an **initialisation handshake**: the client sends its supported protocol version and capabilities, the server responds with its own version and the capabilities it actually supports (which primitives, which optional features), and only after this negotiation does either side send real requests. This matters because it lets the protocol evolve — a client and server on different versions can still interoperate on their common subset instead of failing outright.
+Every connection starts with an **initialisation handshake**: the client sends its supported protocol version and capabilities, the server responds with its own version and the capabilities it actually supports (which primitives, which optional features), and the client then sends an `initialized` notification to confirm the session is ready. Only after this negotiation do real requests flow. This matters because it lets the protocol evolve — a client and server on different versions can still interoperate on their common subset instead of failing outright.
 
 ```mermaid
 sequenceDiagram
     participant C as "Client"
     participant S as "Server"
     C->>S: "initialize (protocol version, capabilities)"
-    S->>C: "initialized (server info, capabilities)"
+    S->>C: "initialize result (server info, capabilities)"
+    C->>S: "notifications/initialized"
     C->>S: "tools/list"
     S->>C: "available tools"
     C->>S: "tools/call (name, arguments)"
@@ -175,7 +182,7 @@ The three primitives are tools, resources, and prompts. Tools are actions the mo
 
 ### Q4. Walk through what happens during MCP's initialisation handshake and why it exists.
 
-When a client connects to a server, the client first sends an `initialize` request declaring the protocol version it supports and which capabilities it implements. The server responds with its own protocol version and the specific capabilities it supports — which primitives it offers, which optional protocol features are available. Only after this negotiation completes does either side send real requests like listing or calling tools. This exists so the protocol can evolve without breaking every existing integration: a newer client talking to an older server can still interoperate on the capabilities they both support, rather than failing outright because of a version mismatch, the same reason HTTP content negotiation or API version headers exist.
+When a client connects to a server, the client first sends an `initialize` request declaring the protocol version it supports and which capabilities it implements. The server responds with its own protocol version and the specific capabilities it supports — which primitives it offers, which optional protocol features are available. The client then sends an `initialized` notification, and only after that do real requests like listing or calling tools begin. This exists so the protocol can evolve without breaking every existing integration: a newer client talking to an older server can still interoperate on the capabilities they both support, rather than failing outright because of a version mismatch, the same reason HTTP content negotiation or API version headers exist.
 
 ### Q5. How does an MCP server differ from a typical REST API, beyond just the wire format?
 

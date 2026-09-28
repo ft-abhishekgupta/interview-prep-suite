@@ -22,6 +22,27 @@ A **chatbot** maps one input to one output through a fixed prompt — no branchi
 > [!KEY]
 > The interview-winning line: *"An agent is defined by autonomy over control flow — the model decides what to do next, not just what to say."* Everything else (tools, memory, loops) is implementation detail on top of that one property.
 
+Said another way, a plain model call is passive and stateless while an agent is semi-autonomous and carries state across turns.
+
+![Comparison of a standard LLM call against an AI agent across goal, capabilities, autonomy and state](notes/AI/image-7.png)
+
+## The Four Moving Parts
+
+Every agent decomposes into the same four components, and naming them cleanly is the fastest way to show you have built one rather than read about one.
+
+![Agent anatomy showing the model core, short and long term memory, planning strategies and tool use](notes/AI/image-3.png)
+
+| Component | What it does | Where it breaks |
+|---|---|---|
+| Core model | Generates reasoning and chooses the next action | Weak instruction following, no self-correction |
+| Memory | Short-term conversation state plus long-term retrieval | Context overflow, stale or irrelevant recall |
+| Planning | Goal decomposition, chain-of-thought, re-planning | Over-decomposition, plans that ignore tool results |
+| Tool use | Acting on the world through APIs, code and search | Wrong tool choice, malformed arguments, silent failure |
+
+Those parts wire together into a loop that only exits when the goal is met or a budget is exhausted.
+
+![Agent loop from user goal through reasoning tools environment and memory to an outcome with a feedback edge](notes/AI/image-5.png)
+
 ## The ReAct Loop
 
 Most agents are built on **ReAct** (Reason + Act): the model produces a thought, chooses an action (usually a tool call), observes the result, and repeats until it decides it has enough information to answer.
@@ -87,6 +108,10 @@ Every extra step in an agent loop is another full model round trip — an 8-step
 Non-determinism compounds with steps: if each step has even a 95% chance of choosing correctly, an 8-step task has roughly a 34% chance of a wrong step somewhere (0.95⁸ ≈ 0.66). This is why agents need **evals over full trajectories**, not just final-answer checks — pass rate should be measured across many runs of the same task, and tests should assert on properties ("did it call the refund tool with the correct order ID") rather than exact output strings, since the exact path taken may legitimately vary between runs.
 
 ## Common Failure Modes and Mitigations
+
+The honest one-slide summary of the trade: real autonomy over complex tasks, paid for in hallucination risk, latency, tool errors, safety exposure, cost and a debugging story far harder than a deterministic pipeline.
+
+![Agent pros of autonomy, complex tasks and efficiency against cons of hallucination, latency, tool error, safety, cost and debugging difficulty](notes/AI/image-4.png)
 
 | Failure mode | What it looks like | Mitigation |
 |---|---|---|

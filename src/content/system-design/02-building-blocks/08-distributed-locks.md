@@ -90,7 +90,7 @@ Coordination services designed exactly for this problem are the "correct" answer
 - **ZooKeeper**: create an **ephemeral sequential znode**; the client holding the lowest-numbered znode holds the lock. If the client's session dies (heartbeat stops), the znode is automatically deleted, releasing the lock — no manual TTL guessing.
 - **etcd**: a **lease** with a TTL, refreshed by heartbeats; a lock is a key tied to the lease, released automatically when the lease expires or the client disconnects.
 
-Both give you a **watch/notify** mechanism so waiters are told immediately when the lock is released, instead of polling — and both run on Raft, so they tolerate node failures without a single point of failure the way one Redis node would.
+Both give you a **watch/notify** mechanism so waiters are told immediately when the lock is released, instead of polling. ZooKeeper uses ZAB and etcd uses Raft, so both tolerate node failures through quorum replication instead of depending on one Redis node.
 
 | Mechanism | Lock backing | Release trigger | Notify waiters |
 |---|---|---|---|

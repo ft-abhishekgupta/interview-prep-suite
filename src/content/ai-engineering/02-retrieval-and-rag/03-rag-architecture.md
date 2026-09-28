@@ -32,6 +32,13 @@ flowchart TD
 > [!KEY]
 > Say the two halves explicitly in an interview: "Ingestion happens whenever content changes and is not latency-sensitive; the query path happens on every user request and is where your latency budget and failure modes actually live." Conflating the two is a common junior mistake.
 
+Drawn end to end, the same embedding model sits on both halves — documents are chunked and vectorised into the store ahead of time, then the user's query is vectorised with that same model so the two live in a comparable space.
+
+![RAG pipeline with an indexing path chunking and vectorising documents into a vector store and a query path retrieving contexts to augment the prompt](notes/AI/image.png)
+
+> [!WARNING]
+> Using a different embedding model on the ingestion path and the query path is the single most destructive RAG bug. Retrieval silently returns near-random neighbours, the model confidently answers from irrelevant context, and nothing errors. Pin the model version on both sides and re-index whenever it changes.
+
 ## Why RAG instead of fine-tuning
 
 Both approaches inject knowledge the base model doesn't have, but they solve different problems.

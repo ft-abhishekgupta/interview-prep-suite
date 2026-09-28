@@ -38,7 +38,7 @@ flowchart LR
     IDX --> P4["run maps to doc 2"]
 ```
 
-Each term points to a **postings list** of document IDs (plus positions and term frequency for ranking). A query for `brown` is now an `O(1)` hash/B-tree lookup into the index, not a scan of every document.
+Each term points to a **postings list** of document IDs (plus positions and term frequency for ranking). A query for `brown` is now a term-dictionary lookup followed by work over the matching postings list, not a scan of every document; the cost is proportional to matched postings and intersections, not total corpus size.
 
 ### Building the index: the analysis pipeline
 
@@ -154,7 +154,7 @@ Full-text search is powered by the inverted index, built by an analyzer pipeline
 
 ### Q1. Why doesn't a `LIKE '%term%'` query scale for search, and what's the alternative?
 
-A leading-wildcard `LIKE` cannot use a standard B-tree index because the index is sorted by prefix, not substring, so the database falls back to scanning every row and testing the string — an `O(n)` operation per query that gets worse as the table grows, with no relevance ranking, typo tolerance, or stemming. The alternative is a dedicated search engine (Elasticsearch, Azure AI Search) backed by an inverted index, which maps terms directly to the documents containing them, giving near-constant-time lookups regardless of corpus size, plus built-in ranking, faceting, and language-aware matching that SQL simply was not designed to provide.
+A leading-wildcard `LIKE` cannot use a standard B-tree index because the index is sorted by prefix, not substring, so the database falls back to scanning every row and testing the string — an `O(n)` operation per query that gets worse as the table grows, with no relevance ranking, typo tolerance, or stemming. The alternative is a dedicated search engine (Elasticsearch, Azure AI Search) backed by an inverted index, which maps terms directly to the documents containing them, so query cost is driven mainly by term lookup, postings-list intersections and the number of matches rather than by scanning the whole corpus.
 
 ### Q2. What is an inverted index and why is it the core data structure of search?
 

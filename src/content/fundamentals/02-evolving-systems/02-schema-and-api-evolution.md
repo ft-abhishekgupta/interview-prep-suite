@@ -23,7 +23,7 @@ Walking through a rename of `user.name` to `user.full_name`:
 
 1. **Expand** — add `full_name` as a new nullable column; old code is untouched and still works.
 2. **Dual-write** — deploy code that writes to *both* `name` and `full_name` on every insert/update, but still reads from `name`. This version can run alongside the old version during rollout.
-3. **Backfill** — copy existing rows' `name` into `full_name` in batches (see below), for rows written before dual-write went live.
+3. **Backfill** — copy existing rows' `name` into `full_name` in bounded, throttled batches for rows written before dual-write went live.
 4. **Migrate reads** — deploy code that reads `full_name` instead of `name`. Verify correctness in production.
 5. **Contract** — once nothing reads or writes `name`, stop writing it, then drop the column in a later, separate deploy.
 
@@ -46,14 +46,23 @@ Adding a column is safe only if it doesn't force existing rows into an invalid s
 -- Step 1 (expand): safe even on a huge table, no default computation needed
 ALTER TABLE users ADD COLUMN full_name VARCHAR(255) NULL;
 
--- Step 3 (backfill): batched, not a single giant UPDATE that locks the table
-UPDATE users SET full_name = name
-WHERE full_name IS NULL
-LIMIT 1000; -- repeat until 0 rows affected, with a short pause between batches
+-- Step 3 (backfill): bounded by primary key, not one giant UPDATE
+WITH batch AS (
+  SELECT id
+  FROM users
+  WHERE full_name IS NULL
+  ORDER BY id
+  LIMIT 1000
+)
+UPDATE users u
+SET full_name = u.name
+FROM batch
+WHERE u.id = batch.id;
+-- Repeat until 0 rows are updated, with a short pause between batches.
 ```
 
 > [!WARNING]
-> A single `UPDATE users SET full_name = name` with no `LIMIT`/batching on a large table can hold a long-running transaction, bloat the write-ahead log, and block other writers for the duration. Always backfill in bounded batches with a brief pause between them.
+> A single `UPDATE users SET full_name = name` with no batching on a large table can hold a long-running transaction, bloat the write-ahead log, and block other writers for the duration. Always backfill in bounded batches with a brief pause between them.
 
 ## Adding an index without locking
 

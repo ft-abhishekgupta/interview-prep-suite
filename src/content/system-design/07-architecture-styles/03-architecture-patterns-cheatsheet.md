@@ -5,7 +5,7 @@ difficulty: Core
 tags: [patterns, reference, architecture, cheatsheet]
 ---
 
-This is a reference page, not a tutorial — every pattern below has its own body of theory elsewhere on this site (saga, CQRS, event sourcing, circuit breakers all have dedicated pages), but interviews often move fast enough that you need the one-line "problem it solves / when to use / when not to" recall without re-deriving it. Use this to jog your memory mid-interview, and to sanity-check that you're reaching for the right tool rather than the first one that comes to mind.
+This is a reference page, not a tutorial. Interviews often move fast enough that you need the one-line "problem it solves / when to use / when not to" recall without re-deriving it. Use this to jog your memory mid-interview, and to sanity-check that you're reaching for the right tool rather than the first one that comes to mind.
 
 ## The pattern reference table
 
@@ -41,7 +41,7 @@ This is a reference page, not a tutorial — every pattern below has its own bod
 | **Anti-Corruption Layer** | A legacy or external system's model would otherwise leak into and corrupt your clean domain model | Integrating with a legacy system or third party whose model doesn't match yours | Both sides already share a clean, compatible model | A translation layer converting a legacy XML SOAP model into your domain's clean objects |
 
 > [!KEY]
-> In an interview, naming the pattern is worth little without the trade-off. The strongest version of any answer above is: *"I'd use [pattern] because [problem it solves] — the cost is [when not to / what it doesn't solve], so I'd avoid it if [condition]."*
+> In an interview, naming the pattern is worth little without the trade-off. The strongest version of a pattern answer is: *"I'd use [pattern] because [problem it solves] — the cost is [when not to / what it doesn't solve], so I'd avoid it if [condition]."*
 
 ## Which pattern for which symptom
 

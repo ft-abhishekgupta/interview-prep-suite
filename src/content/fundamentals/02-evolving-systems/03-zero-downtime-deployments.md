@@ -19,7 +19,7 @@ Zero downtime is impossible without these already in place; skipping any one of 
 | Graceful shutdown | An instance must finish in-flight work before it stops accepting new work and exits |
 
 > [!KEY]
-> Zero downtime deployment is really "zero downtime *given* backward compatibility and statelessness" — most of the hard work happens in change design (see schema/API evolution), not in the deploy tool itself.
+> Zero downtime deployment is really "zero downtime *given* backward compatibility and statelessness" — most of the hard work happens in change design, not in the deploy tool itself.
 
 ## Connection draining and graceful shutdown
 

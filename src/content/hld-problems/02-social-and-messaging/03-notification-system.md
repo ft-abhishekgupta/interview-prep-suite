@@ -51,7 +51,7 @@ The requirements sketch is worth drawing before anything else, since the whole d
 | SMS provider ceiling (typical) | rate-limited by provider | ~500/sec/account | needs queuing + backpressure |
 
 > [!TIP]
-> Lead with the isolation requirement: "critical traffic is under 2% of volume but has the tightest latency SLA — the design has to guarantee it never queues behind the other 98%." That framing is what separates this from "just a queue with workers."
+> Lead with the isolation requirement: "critical traffic is only about 5% of volume but has the tightest latency SLA — the design has to guarantee it never queues behind the other 95%." That framing is what separates this from "just a queue with workers."
 
 ## Core entities and data model
 
@@ -91,7 +91,7 @@ The producing-service-facing routes and the internal campaign/preference endpoin
 
 ![alt text](notes/HLD/Problems/NotificationSystem/image-2.png)
 
-```
+```http
 POST /notifications
 {
   "user_id": "u_1", "template_id": "otp_login", "channel": "sms",

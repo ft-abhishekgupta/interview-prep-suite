@@ -83,7 +83,7 @@ Following is modeled as a simple directed edge, but at scale it's backed by a se
 
 ![alt text](notes/HLD/Problems/NewsFeed/image-2.png)
 
-```
+```http
 POST /posts
 { "content": "...", "media_url": "optional" }
 -> 200 { "postId": "p_123" }
@@ -115,7 +115,7 @@ flowchart LR
     Rank --> Cache[("Feed Cache")]
 ```
 
-**Post creation flow:** (1) client submits a post, (2) post service persists it and stores media in object storage/CDN, (3) the post ID is pushed to a fan-out queue, (4) a worker pool reads the queue and writes the post ID into the precomputed timeline of each follower — but only for authors under a follower-count threshold (see below). Drawn end to end, that path looks like this:
+**Post creation flow:** (1) client submits a post, (2) post service persists it and stores media in object storage/CDN, (3) the post ID is pushed to a fan-out queue, (4) a worker pool reads the queue and writes the post ID into the precomputed timeline of each follower for authors under a follower-count threshold; authors above that threshold are stored only and merged into feeds at read time. Drawn end to end, that path looks like this:
 
 ![alt text](notes/HLD/Problems/NewsFeed/image-1.png)
 

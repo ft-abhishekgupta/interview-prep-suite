@@ -33,7 +33,7 @@ flowchart LR
 ```
 
 > [!KEY]
-> Every control-flow pattern above is trading cost/latency for reliability in a specific, nameable way. The interview answer that scores well says which axis you're trading and why the task justifies it — not just "we added an evaluator step."
+> Every control-flow pattern trades cost/latency for reliability in a specific, nameable way. The interview answer that scores well says which axis you're trading and why the task justifies it — not just "we added an evaluator step."
 
 ## Knowledge and Action Patterns
 

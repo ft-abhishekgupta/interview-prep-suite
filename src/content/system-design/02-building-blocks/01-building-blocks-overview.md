@@ -1,18 +1,18 @@
 ---
 title: Building Blocks Overview
-description: A map of the reusable components every high level design is assembled from and which page covers each one in depth
+description: A map of the reusable components every high level design is assembled from and the trade off each one adds
 difficulty: Foundational
 tags: [system-design, building-blocks, architecture]
 ---
 
-Almost every system design interview, however different the prompt sounds, gets assembled from the same small parts bin: something to route traffic, something to hold state, something to absorb load, something to make reads fast. This page is the tour of that parts bin — what each component solves, when it earns its place in a design, and which page in this group covers it end to end. Treat it as the index you skim before a design, not the place you learn any one component deeply.
+Almost every system design interview, however different the prompt sounds, gets assembled from the same small parts bin: something to route traffic, something to hold state, something to absorb load, something to make reads fast. This page is the tour of that parts bin — what each component solves, when it earns its place in a design, and what trade-off it adds. Treat it as a fast map before a design, not as a reason to add every component by default.
 
 > [!KEY]
 > A component belongs in your design the moment a stated requirement forces it, not because the problem "sounds like" it needs one. Naming a load balancer, a cache, and a queue before you've established why is the single most common way to lose the "problem navigation" score.
 
 ## Proxies: the traffic layer underneath everything
 
-Every one of the network-facing building blocks below is, structurally, a proxy — something that sits between a client and the real destination and does useful work in the middle.
+Every network-facing building block in this layer is, structurally, a proxy — something that sits between a client and the real destination and does useful work in the middle.
 
 ![alt text](notes/05-HighLevelDesign/BuildingBlocks/image.png)
 
@@ -28,17 +28,17 @@ Every one of the network-facing building blocks below is, structurally, a proxy 
 
 Read this table top to bottom as the rough order components get added to a design as it scales — start with nothing, add the next row only when a requirement or a bottleneck forces it.
 
-| Component | What it solves | Reach for it when | Covered in depth |
+| Component | What it solves | Reach for it when | Trade-off to name |
 |---|---|---|---|
-| **Load balancer** | One server falling over takes the whole service down | You have more than one backend instance and need traffic spread evenly | Load Balancing |
-| **API gateway / reverse proxy** | Every microservice re-implementing auth, rate limiting, routing | You have more than one service and need a single front door | API Gateway and Reverse Proxy |
-| **CDN / edge cache** | Every request round-tripping to one origin, regardless of user location | Content is read far more than it's written and users are geographically spread | CDN and Edge Delivery |
-| **Cache (Redis/Memcached)** | Repeating expensive reads against the database | A read is hot, uniform, and tolerant of a little staleness | Caching Strategies, Cache Pitfalls and Invalidation |
-| **Object storage** | Large files bloating a relational database | You're storing images, video, backups, or any blob measured in megabytes+ | Object Storage and Blobs |
-| **Search / inverted index** | `LIKE '%term%'` scanning entire tables | Users need full-text, fuzzy, or faceted search over unstructured text | Search and Indexing |
-| **Message queue / pub-sub** | A slow or bursty operation blocking the request that triggered it | Work can be done asynchronously, or many consumers need the same event | Message Queues and Pub Sub |
-| **Distributed lock** | Two processes on two machines racing for the same resource | A single database row-lock can't reach across services or outlive one transaction | Distributed Locks |
-| **Job scheduler / workflow engine** | Cron jobs that don't survive a crash, or multi-step processes with no single owner | Work is recurring, delayed, or spans multiple steps that must all eventually complete | Job Scheduling and Workflows |
+| **Load balancer** | One server falling over takes the whole service down | You have more than one backend instance and need traffic spread evenly | The balancer itself must be redundant |
+| **API gateway / reverse proxy** | Every microservice re-implementing auth, rate limiting, routing | You have more than one service and need a single front door | Extra hop, bottleneck and policy-sprawl risk |
+| **CDN / edge cache** | Every request round-tripping to one origin, regardless of user location | Content is read far more than it's written and users are geographically spread | Cache-key, TTL and invalidation complexity |
+| **Cache (Redis/Memcached)** | Repeating expensive reads against the database | A read is hot or skewed, and tolerant of a little staleness | Invalidation, stampede and outage fallback |
+| **Object storage** | Large files bloating a relational database | You're storing images, video, backups, or any blob measured in megabytes+ | Metadata sync and orphan cleanup |
+| **Search / inverted index** | `LIKE '%term%'` scanning entire tables | Users need full-text, fuzzy, or faceted search over unstructured text | Index lag, reindexing and derived-data drift |
+| **Message queue / pub-sub** | A slow or bursty operation blocking the request that triggered it | Work can be done asynchronously, or many consumers need the same event | At-least-once delivery, idempotency and lag |
+| **Distributed lock** | Two processes on two machines racing for the same resource | A single database row-lock can't reach across services or outlive one transaction | TTL expiry, fencing tokens and contention |
+| **Job scheduler / workflow engine** | Cron jobs that don't survive a crash, or multi-step processes with no single owner | Work is recurring, delayed, or spans multiple steps that must all eventually complete | Duplicate runs, idempotency and stuck workflows |
 
 ```mermaid
 flowchart LR
@@ -61,7 +61,7 @@ flowchart LR
 
 ## Inside a single service: the request lifecycle
 
-Zooming into any one box in the diagram above, a typical backend service is itself built from a small, repeating set of layers. These get their own deep treatment in the Spring Boot and API design pages, so here they are just named and placed.
+Zooming into a single backend service, the same small set of layers shows up repeatedly. The important interview point is where each responsibility belongs so HTTP, business logic, and persistence do not blur together.
 
 | Layer | Job | Notes |
 |---|---|---|
@@ -104,7 +104,7 @@ Object storage (Amazon S3, Azure Blob Storage, Google Cloud Storage) deserves a 
 
 ## Summary
 
-A high-level design is built from a recurring, small set of parts: proxies that route traffic, load balancers and gateways that spread and gate it, caches and CDNs that make reads fast, object storage that keeps large files out of the database, search indexes that make unstructured text queryable, queues that decouple slow work from the request path, and locks or workflow engines that coordinate work across machines. Inside any one service, the same controller → middleware → service → repository layering recurs. The skill this page maps to is recognising *which* component a requirement actually calls for, and reaching for the dedicated page on it once you know.
+A high-level design is built from a recurring, small set of parts: proxies that route traffic, load balancers and gateways that spread and gate it, caches and CDNs that make reads fast, object storage that keeps large files out of the database, search indexes that make unstructured text queryable, queues that decouple slow work from the request path, and locks or workflow engines that coordinate work across machines. Inside any one service, the same controller → middleware → service → repository layering recurs. The skill this page maps to is recognising *which* component a requirement actually calls for, and naming the cost and failure mode it brings once you add it.
 
 ## Top Interview Questions
 

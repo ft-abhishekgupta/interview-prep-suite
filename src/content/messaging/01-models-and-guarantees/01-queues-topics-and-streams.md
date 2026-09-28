@@ -117,7 +117,7 @@ consumer.Commit(result); // advances offset; a new group (or a reset) can still 
 
 ## When each is right
 
-- **Task to be done exactly once by somebody** → competing-consumer queue.
+- **Task to be handled by one worker, with retries and idempotency for safety** → competing-consumer queue.
 - **Fact that several independent systems must react to** → pub-sub topic.
 - **History that must be replayable, or read at different speeds by different consumers** → partitioned log.
 - **High-throughput telemetry, clickstream, or CDC feed** → partitioned log, because per-message broker bookkeeping does not scale to millions of messages per second.

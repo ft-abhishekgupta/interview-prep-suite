@@ -25,7 +25,7 @@ Pure RBAC breaks down when permissions genuinely depend on more than "which role
 
 ABAC replaces the combinatorial role list with a single policy that evaluates attributes at request time:
 
-```
+```text
 allow if user.role == "manager"
    and user.department == resource.department
    and resource.amount < 500

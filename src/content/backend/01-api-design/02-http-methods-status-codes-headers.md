@@ -44,7 +44,7 @@ HTTP is the substrate almost every backend interview question sits on top of. In
 |---|---|---|
 | 2xx | Success | 200, 201, 202, 204 |
 | 3xx | Redirection / caching | 301, 302, 304 |
-| 4xx | Client error | 400, 401, 403, 404, 405, 409, 410, 412, 415, 422, 429 |
+| 4xx | Client error | 400, 401, 403, 404, 405, 409, 410, 412, 415, 422, 428, 429 |
 | 5xx | Server error | 500, 502, 503, 504 |
 
 | Code | Name | When to use it |
@@ -66,6 +66,7 @@ HTTP is the substrate almost every backend interview question sits on top of. In
 | 412 | Precondition Failed | `If-Match`/`If-Unmodified-Since` check failed — optimistic concurrency |
 | 415 | Unsupported Media Type | `Content-Type` isn't something the server accepts |
 | 422 | Unprocessable Entity | Syntactically valid, semantically invalid (failed business validation) |
+| 428 | Precondition Required | Server requires a conditional header such as `If-Match` to prevent lost updates |
 | 429 | Too Many Requests | Rate limit exceeded — include `Retry-After` |
 | 500 | Internal Server Error | Unhandled exception, server's fault |
 | 502 | Bad Gateway | Upstream service returned an invalid response |
@@ -175,7 +176,7 @@ Access-Control-Max-Age: 600
 - 201 needs a `Location` header. 204 has no body. 202 means "accepted, not finished yet."
 - 400 = malformed request. 422 = well-formed but fails business validation. Don't conflate them.
 - 401 = not authenticated. 403 = authenticated but not permitted. This is the other classic mix-up.
-- 409 = conflicts with current state. 412 = a conditional header check failed (optimistic concurrency).
+- 409 = conflicts with current state. 412 = a conditional header check failed; 428 = the required conditional header was missing.
 - `ETag` + `If-None-Match` powers conditional GET (304, no body). `ETag` + `If-Match` powers conditional writes (412 on conflict).
 - 429 and 503 should both carry `Retry-After` so well-behaved clients back off correctly.
 - CORS preflight is triggered by non-simple requests and must be answered with explicit allow headers, not just a 200.

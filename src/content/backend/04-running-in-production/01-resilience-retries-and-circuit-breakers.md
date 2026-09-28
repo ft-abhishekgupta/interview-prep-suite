@@ -13,7 +13,7 @@ An HTTP call, a database query, or a queue receive with **no timeout** will wait
 
 ```csharp
 var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-// or, per-request with a resilience pipeline (recommended — see below):
+// or, per-request with a resilience pipeline:
 var pipeline = new ResiliencePipelineBuilder()
     .AddTimeout(TimeSpan.FromSeconds(2))
     .Build();
@@ -97,13 +97,13 @@ Resilience strategies compose, and **order changes behaviour**. A common, sensib
 
 | Order | Policy | Why here |
 |---|---|---|
-| 1 (outermost) | Fallback | Catches anything that still fails after everything below it |
+| 1 (outermost) | Fallback | Catches anything that still fails after inner policies finish |
 | 2 | Circuit breaker | Stops calling a clearly-broken dependency before paying for retries/timeouts |
 | 3 | Retry | Retries individual attempts within the circuit's view |
 | 4 (innermost) | Timeout | Bounds each individual attempt |
 
 > [!DANGER]
-> Putting retry **outside** the circuit breaker means each "retry" is seen by the breaker as a separate failure count reset, and you can retry your way past a breaker that should have opened — defeating its purpose. Putting timeout outside retry means a single timeout ends the whole operation instead of bounding each attempt.
+> Putting retry **outside** the circuit breaker makes one logical operation consume multiple failure counts and can amplify traffic before the breaker opens. Decide the order deliberately; the common choice is breaker outside retry so it judges the final outcome of the retry group. Putting timeout outside retry means a single timeout ends the whole operation instead of bounding each attempt.
 
 ## Polly and the .NET resilience pipeline
 
@@ -198,7 +198,7 @@ Bulkhead isolation limits how much of a shared resource — typically concurrenc
 
 ### Q7. In what order should you compose timeout, retry, circuit breaker and fallback, and what goes wrong if you get the order wrong?
 
-The typical correct order, from outermost to innermost, is fallback, then circuit breaker, then retry, then timeout — so each individual attempt is bounded by a timeout, several attempts are grouped and retried within the circuit breaker's view, the circuit breaker observes the aggregate outcome across many calls to decide whether to open, and a fallback catches whatever still fails after all of that. If retry is placed outside the circuit breaker instead, each retry attempt can look like a fresh call to the breaker in a way that resets or dilutes its failure tracking, effectively letting retries "route around" a breaker that should have opened and continuing to hammer a dependency that's clearly down. If timeout is placed outside retry, one timeout ends the entire multi-attempt operation instead of bounding just the current attempt, defeating the purpose of having multiple attempts at all.
+The typical correct order, from outermost to innermost, is fallback, then circuit breaker, then retry, then timeout — so each individual attempt is bounded by a timeout, several attempts are grouped and retried within the circuit breaker's view, the circuit breaker observes the aggregate outcome across many calls to decide whether to open, and a fallback catches whatever still fails after all of that. If retry is placed outside the circuit breaker instead, one logical operation can be counted as several breaker failures and can keep issuing attempts until the breaker opens, increasing load exactly when the dependency is unhealthy. If timeout is placed outside retry, one timeout ends the entire multi-attempt operation instead of bounding just the current attempt, defeating the purpose of having multiple attempts at all.
 
 ### Q8. When is a fallback the right response to a failure, and when is it dangerous?
 

@@ -67,7 +67,7 @@ flowchart LR
 | Palindromic Substrings | 2 Pointers | Expand centers or palindrome DP | `O(n^2)/O(1); O(n^2)/O(n^2)` |
 | Longest Substring Without Repeating Characters | Sliding Window | HashSet window or last-seen index | `O(n)/O(k)` |
 | Longest Repeating Character Replacement | Sliding Window | Valid while `window - maxFreq <= k` | `O(n)/O(k)` |
-| Minimum Window Substring | Sliding Window | Need and window counts with formed targets | `O(|s| + |t|)/O(k)` |
+| Minimum Window Substring | Sliding Window | Need and window counts with formed targets | `O(\|s\| + \|t\|)/O(k)` |
 | Subarray Product Less Than K | Sliding Window | Shrink while product is too large | `O(n)/O(1)` |
 | Valid Parentheses | Stack | Push expected closing bracket | `O(n)/O(n)` |
 | Evaluate Reverse Polish Notation | Stack | Push operands and pop two on operator | `O(n)/O(n)` |
@@ -147,7 +147,7 @@ flowchart LR
 | House Robber II | DP | Two linear DPs for the circle | `O(n)/O(n)` |
 | House Robber III | DP | Return rob and skip totals per node | `O(N)/O(H)` |
 | Decode Ways | DP | One-digit and two-digit transitions | `O(n)/O(n)` |
-| Word Break | DP | `dp[i]` over split points | `O(n^2)/O(n)` |
+| Word Break | DP | `dp[i]` over split points | `O(n^3)/O(n)` as written in Java because `substring` copies |
 | Partition Equal Subset Sum | DP | 0/1 knapsack to `total / 2` | `O(n * target)/O(target)` |
 | Edit Distance | DP | Insert, delete, replace recurrence | `O(m * n)/O(m * n)` |
 | Best Time to Buy and Sell Stock with Cooldown | DP | Hold, sold, rest state machine | `O(n)/O(1)` |
@@ -1903,7 +1903,7 @@ class Solution {
     private static long hoursNeeded(int[] piles, int speed) {
         long hours = 0;
         for (int pile : piles)
-            hours += (pile + speed - 1) / speed;
+            hours += (pile + (long) speed - 1) / speed;
 
         return hours;
     }
@@ -1934,7 +1934,7 @@ class Solution {
     private static long hoursNeeded(int[] piles, int speed) {
         long hours = 0;
         for (int pile : piles)
-            hours += (pile + speed - 1) / speed;
+            hours += (pile + (long) speed - 1) / speed;
 
         return hours;
     }
@@ -2034,7 +2034,7 @@ class MedianFinder {
 
     public double findMedian() {
         if (lower.size() == upper.size())
-            return (lower.peek() + upper.peek()) / 2.0;
+            return (lower.peek() + (double) upper.peek()) / 2.0;
 
         return lower.peek();
     }
@@ -3716,7 +3716,7 @@ class Solution {
 
 ### Word Break
 
-**Time:** `O(n^2)` dictionary checks | **Space:** `O(n)` DP, excluding substring copies
+**Time:** `O(n^3)` as written in Java 17 because each `substring` copy can cost `O(n)` | **Space:** `O(n)` DP, excluding the dictionary
 
 ```java
 class Solution {

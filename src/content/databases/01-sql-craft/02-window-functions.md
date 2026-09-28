@@ -94,11 +94,13 @@ FROM orders;
 |---|---|---|
 | Unit | Physical row count | Logical value equality on `ORDER BY` key |
 | Ties in ORDER BY | Each row counted separately | All peer rows (same value) treated as one unit |
-| Default frame (no clause) | N/A — must be specified | `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
+| Default when `ORDER BY` is present and no frame is written | No `ROWS` frame is implied | `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` |
 | Performance | Generally faster, simpler to reason about | Can silently include more rows than expected when ties exist |
 | Typical use | Moving average of last N rows | Running total that should treat tied dates as one group |
 
 `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW` always means "this row and the two immediately before it, physically". `RANGE BETWEEN 2 PRECEDING AND CURRENT ROW` on a numeric `ORDER BY` means "all rows whose value is within 2 of this row's value" — a different, less commonly needed semantic. Default to `ROWS` unless you specifically need value-based framing.
+
+Two extra details make this interview-safe. First, a window `ORDER BY` is separate from the final result's `ORDER BY`: it defines calculation order, not necessarily output order. If the final rows must be displayed in that same order, add a normal outer `ORDER BY` too. Second, tie handling is only deterministic when the `ORDER BY` list is unique. A running total over `ORDER BY order_date` can process two same-day rows in either physical order under a `ROWS` frame, so add a stable tiebreaker such as `order_id` whenever row-by-row progression matters.
 
 ## Top-N-per-group
 
@@ -184,7 +186,7 @@ WITH ranked AS (
 SELECT * FROM ranked WHERE rn <= 3;
 ```
 
-`PARTITION BY department_id` resets the ranking per department; `ROW_NUMBER` gives exactly 3 rows per group. If "top 3" should include everyone tied for 3rd place, use `RANK()` instead, which can return more than 3 rows for a department with ties at the boundary.
+`PARTITION BY department_id` resets the numbering independently for each department, so Engineering gets its own 1, 2, 3 and Sales gets its own 1, 2, 3. The outer query is required because the `rn` value is produced by the `SELECT` list and cannot be filtered in the same query's `WHERE`. `ROW_NUMBER()` is the right choice when the requirement is exactly three rows per department, even if salaries tie; add a deterministic tiebreaker such as `employee_id` to avoid arbitrary order. If the business wording is "top 3 ranks including ties", use `RANK()` instead, accepting that a department can return more than three rows when several employees tie at the boundary.
 
 ### Q3. Why can't you filter directly on a window function in the WHERE clause of the same query?
 
@@ -192,7 +194,7 @@ Logical query processing evaluates `WHERE` before `SELECT`, and window functions
 
 ### Q4. Explain the difference between a ROWS frame and a RANGE frame.
 
-`ROWS` defines the frame by physical row position — `ROWS BETWEEN 1 PRECEDING AND CURRENT ROW` always means exactly two physical rows. `RANGE` defines the frame by logical value equality on the `ORDER BY` key — `RANGE BETWEEN CURRENT ROW AND CURRENT ROW` (the implicit default) actually includes **all rows that tie with the current row's ORDER BY value**, not just the current physical row. This matters most with duplicate `ORDER BY` values: a running total using the default `RANGE` frame will give the same (larger) cumulative value to every tied row, whereas `ROWS` gives each physical row its own progressively increasing total. Default to `ROWS` unless the tie-as-one-group semantic is exactly what's needed.
+`ROWS` defines the frame by physical row position — `ROWS BETWEEN 1 PRECEDING AND CURRENT ROW` always means exactly two physical rows. `RANGE` defines the frame by logical `ORDER BY` values and peer rows. When an aggregate window has `ORDER BY` but no explicit frame, SQL defaults to `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, so the frame includes all earlier sort-key values **and every row tied with the current row's sort key**. This matters with duplicate `ORDER BY` values: a running total using the default `RANGE` frame gives the same cumulative value to all tied rows, whereas `ROWS` advances one physical row at a time. Default to an explicit `ROWS` frame unless tie-as-one-group semantics are intentional.
 
 ### Q5. What's the bug in this query, and how do you fix it: `LAST_VALUE(salary) OVER (ORDER BY hire_date)`?
 
@@ -210,7 +212,7 @@ SELECT
 FROM daily_sales;
 ```
 
-`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` gives a 7-row window (today plus the six before). Note this assumes one row per calendar day with no gaps; if dates can be missing, a `RANGE`-based date interval or a calendar-table join is needed so "7 days" reflects actual dates rather than 7 physical rows.
+`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW` gives a seven-row frame: the current row plus the six physical rows before it. That is correct only if `daily_sales` has exactly one row per calendar day per series. If weekends, holidays, or missing data leave gaps, this becomes a "last seven recorded rows" average, not a true last-seven-calendar-days average. In that case, join to a calendar table first so missing days appear with zero or `NULL` as appropriate, or use an engine-specific interval frame where supported. Also make the `ORDER BY` deterministic if there can be multiple rows for the same date.
 
 ### Q7. How do window functions compare to GROUP BY, and when would you use each?
 
@@ -226,7 +228,7 @@ WITH dedup AS (
 DELETE FROM dedup WHERE rn > 1;
 ```
 
-`PARTITION BY email` groups duplicates, `ORDER BY employee_id` makes the earliest row `rn = 1`, and deleting `rn > 1` removes every duplicate but the first, directly through the CTE since it's built on a single base table with no aggregation, making it updatable/deletable in SQL Server.
+`PARTITION BY email` creates a separate numbering sequence for each duplicate group, and `ORDER BY employee_id` makes the lowest employee ID the survivor with `rn = 1`. Deleting `rn > 1` removes every later row in the group. The `ORDER BY` is not decoration — it is the business rule for which copy survives, so use `created_at`, `last_updated`, or another deterministic column if "earliest employee_id" is not the real rule. In SQL Server this CTE is deletable because it is a simple projection over one base table with no aggregation or joins; in other engines you may need a `DELETE ... USING` or join-back form.
 
 ### Q9. What is NTILE and what's a realistic use case?
 
@@ -243,7 +245,7 @@ SELECT
 FROM orders;
 ```
 
-`PARTITION BY customer_id` ensures each customer's sequence is independent, `LAG(amount, 1, 0)` reads the previous row's amount within that partition (defaulting to `0` for the first order), and subtracting gives the change. Before window functions this required a self-join on "the row with the next-earlier order_date", which is slower and harder to get right with tied dates.
+`PARTITION BY customer_id` gives each customer an independent order history, so one customer's previous order is never compared with another's. `ORDER BY order_date` defines the sequence, but in production I would add a deterministic tiebreaker such as `order_id` because two orders can share the same timestamp. `LAG(amount, 1, 0)` reads the prior amount in that sequence and returns `0` for the first order; subtracting gives the delta. If `0` is misleading for the first order, use `NULL` as the default and handle that case separately. Before window functions this required a self-join to locate the immediately previous order, which is slower and much easier to get wrong with tied dates.
 
 ### Q11. Why might a query with several different window function specifications be slow, and how would you investigate?
 

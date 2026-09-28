@@ -17,6 +17,7 @@ export const SECTION_GROUPS = [
   'Language & Frameworks',
   'Engineering Craft',
   'The Human Round',
+  'Interview Craft',
 ] as const;
 
 export const SECTIONS: SectionMeta[] = [
@@ -161,6 +162,16 @@ export const SECTIONS: SectionMeta[] = [
     hue: 47,
   },
   {
+    id: 'languages',
+    title: 'Language Breadth',
+    short: 'Languages',
+    blurb: 'Python, C++ and Node.js at the depth a polyglot interview probes — enough to hold a credible conversation outside your primary stack.',
+    icon: 'code',
+    priority: 'Medium',
+    group: 'Language & Frameworks',
+    hue: 88,
+  },
+  {
     id: 'security',
     title: 'Security',
     short: 'Security',
@@ -231,14 +242,14 @@ export const SECTIONS: SectionMeta[] = [
     hue: 262,
   },
   {
-    id: 'xbox-systems',
-    title: 'My Xbox Systems Guide',
-    short: 'Xbox Systems',
-    blurb: 'Your own field guide to the services you built and operated — the architectures, concepts and stories behind every résumé bullet.',
-    icon: 'gamepad',
-    priority: 'Critical',
-    group: 'The Human Round',
-    hue: 120,
+    id: 'interview-process',
+    title: 'The Interview Loop',
+    short: 'Interview Craft',
+    blurb: 'How the loop is actually structured and scored — round-by-round tactics, machine-coding rounds, revision plans and the night-before one-pagers.',
+    icon: 'compass',
+    priority: 'High',
+    group: 'Interview Craft',
+    hue: 44,
   },
 ];
 

@@ -54,7 +54,7 @@ The three properties to check, in order:
 
 When no single property is both high-cardinality and query-aligned, combine properties:
 
-- **Synthetic key** — concatenate fields into one string, e.g. `tenantId_deviceId`, giving finer-grained distribution than `tenantId` alone while still supporting tenant-scoped queries via a prefix or a secondary lookup.
+- **Synthetic key** — concatenate fields into one string, e.g. `tenantId_deviceId`, giving finer-grained distribution than `tenantId` alone. The trade-off is that `tenantId`-only queries are no longer true single-partition queries unless the application queries known buckets or maintains a secondary/projection container; a prefix predicate on the synthetic key still fans out.
 - **Hierarchical partition keys** (up to 3 levels, e.g. `/tenantId`, `/userId`, `/sessionId`) — let Cosmos treat each level as part of the physical partitioning without you concatenating strings manually; queries scoped to just `/tenantId` still avoid a full fan-out because Cosmos can prune to the relevant sub-partitions, and it solves the "one big tenant" problem because that tenant's data now spreads across multiple physical partitions by `userId`.
 
 ```csharp

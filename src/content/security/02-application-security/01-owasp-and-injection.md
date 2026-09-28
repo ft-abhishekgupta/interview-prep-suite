@@ -31,8 +31,10 @@ SQL injection happens when untrusted input is concatenated directly into a query
 
 ```csharp
 // VULNERABLE — user input becomes part of the SQL text
-var query = $"SELECT * FROM Users WHERE Username = '{username}' AND Password = '{password}'";
-var result = command.ExecuteReader(query);
+using var command = connection.CreateCommand();
+command.CommandText =
+    $"SELECT * FROM Users WHERE Username = '{username}' AND Password = '{password}'";
+using var result = command.ExecuteReader();
 
 // Attacker sends username: admin' -- 
 // Resulting query: SELECT * FROM Users WHERE Username = 'admin' -- ' AND Password = '...'
@@ -41,10 +43,11 @@ var result = command.ExecuteReader(query);
 
 ```csharp
 // FIXED — parameterized query; input is always treated as data, never as SQL syntax
-var query = "SELECT * FROM Users WHERE Username = @Username AND Password = @PasswordHash";
+using var command = connection.CreateCommand();
+command.CommandText = "SELECT * FROM Users WHERE Username = @Username AND PasswordHash = @PasswordHash";
 command.Parameters.AddWithValue("@Username", username);
 command.Parameters.AddWithValue("@PasswordHash", passwordHash);
-var result = command.ExecuteReader(query);
+using var result = command.ExecuteReader();
 ```
 
 Parameterization works because the database driver sends the query plan and the data **separately** — the input is never re-parsed as SQL syntax, so no amount of quotes or comment markers in the input can change the query's meaning.

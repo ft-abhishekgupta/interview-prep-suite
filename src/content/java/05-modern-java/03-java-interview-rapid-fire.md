@@ -64,8 +64,8 @@ Collections are the densest area of rapid-fire questions because picking the wro
 |---|---|
 | `ArrayList` vs `LinkedList` | `ArrayList` = array-backed, O(1) random access, cache-friendly. `LinkedList` = node-based, O(1) ends but O(n) indexing; rarely worth it. |
 | `HashMap` vs `TreeMap` vs `LinkedHashMap` | `HashMap` = O(1), unordered. `TreeMap` = sorted, O(log n), red-black tree. `LinkedHashMap` = insertion (or access) order. |
-| `HashMap` vs `Hashtable` vs `ConcurrentHashMap` | `HashMap` = not thread-safe, allows null. `Hashtable` = legacy, fully synchronised. `ConcurrentHashMap` = concurrent, segment/bucket-level locking, no null keys/values. |
-| Fail-fast vs fail-safe iterators | Fail-fast (`ArrayList`, `HashMap`) throw `ConcurrentModificationException` on structural change. Fail-safe (`CopyOnWriteArrayList`, `ConcurrentHashMap`) iterate a snapshot/view. |
+| `HashMap` vs `Hashtable` vs `ConcurrentHashMap` | `HashMap` = not thread-safe, allows null. `Hashtable` = legacy, fully synchronised. `ConcurrentHashMap` = concurrent with CAS plus bin-level locking since Java 8, no null keys/values. |
+| Fail-fast vs fail-safe iterators | Fail-fast (`ArrayList`, `HashMap`) throw `ConcurrentModificationException` on structural change. `CopyOnWriteArrayList` iterates a snapshot; `ConcurrentHashMap` is weakly consistent. |
 | `Comparable` vs `Comparator` | `Comparable` = natural ordering via `compareTo` inside the class. `Comparator` = external, multiple orderings, `compare(a,b)`. |
 | `Stream` vs `Collection` | A `Collection` stores data; a `Stream` is a lazy, one-shot pipeline of operations over a source. Streams don't store elements. |
 
@@ -125,7 +125,7 @@ Concurrency rapid-fire questions almost always hinge on the difference between *
 
 | Question | Short answer |
 |---|---|
-| `volatile` vs `synchronized` vs `Atomic` | `volatile` = visibility only, no atomicity. `synchronized` = mutual exclusion + visibility. `Atomic*` = lock-free atomic ops via CAS. |
+| `volatile` vs `synchronized` vs `Atomic` | `volatile` = visibility and ordering, no compound atomicity. `synchronized` = mutual exclusion + visibility. `Atomic*` = lock-free atomic ops via CAS. |
 | `wait` vs `sleep` | `wait` releases the monitor lock and waits for `notify`; `sleep` holds all locks and just pauses the thread. `wait` needs a `synchronized` block. |
 | `Runnable` vs `Callable` | `Runnable.run()` returns void and can't throw checked exceptions; `Callable.call()` returns a value and can throw. |
 | `sleep` vs `yield` vs `join` | `sleep` pauses for a duration; `yield` hints the scheduler to let others run; `join` waits for another thread to finish. |
@@ -135,13 +135,13 @@ Concurrency rapid-fire questions almost always hinge on the difference between *
 
 ## Frameworks and persistence
 
-This group blends core runtime concepts with everyday framework usage. The pass-by-value question in particular is a favourite because so many candidates get the wording wrong.
+This group blends core runtime concepts with everyday framework usage. The classpath-versus-module-path question is a favourite in Java 8-to-17 upgrade conversations.
 
 | Question | Short answer |
 |---|---|
 | JDK vs JRE vs JVM | JVM runs bytecode; JRE = JVM + core libraries (to run apps); JDK = JRE + tools like `javac` (to build apps). |
 | heap vs stack | Heap holds objects, shared and GC-managed. Stack holds per-thread frames with locals and references; freed when the method returns. |
-| pass by value vs reference | Java is always pass by value. For objects the *reference* is passed by value, so you can mutate the object but not reseat the caller's variable. |
+| classpath vs module path | Classpath is a flat legacy search path; module path uses named modules with explicit `requires`/`exports` and strong encapsulation. |
 | `@Transactional` vs manual transactions | `@Transactional` declaratively wraps a method in a Spring-managed transaction; manual = explicit `begin`/`commit`/`rollback`. Declarative is cleaner but proxy-based. |
 
 ## The `equals`/`hashCode` contract
@@ -164,7 +164,7 @@ Three rules to recite: if two objects are `equals`, they must have the same `has
 - `ConcurrentHashMap` for concurrency; `Hashtable` is legacy; `HashMap` isn't thread-safe.
 - `volatile` = visibility, `synchronized` = mutual exclusion, `Atomic` = lock-free CAS.
 - `wait` releases the lock and needs `synchronized`; `sleep` keeps the lock.
-- `orElseGet`/`ofNullable` for laziness/null-safety; Java is always pass by value.
+- `orElseGet`/`ofNullable` for laziness/null-safety; classpath is flat, module path enforces module boundaries.
 - Checked = recoverable and declared; unchecked = programming errors.
 
 ## Common mistakes
@@ -173,14 +173,14 @@ Three rules to recite: if two objects are `equals`, they must have the same `has
 |---|---|
 | Overriding `equals` but not `hashCode` | Override both; equal objects must share a hash code |
 | Comparing `Integer` with `==` | Use `.equals`; only −128..127 are cached |
-| Saying Java is pass by reference | It's pass by value; the reference itself is copied |
+| Expecting JPMS checks on the classpath | Put named modules on the module path; classpath code is in the unnamed module |
 | Using `volatile` for a counter | Use `AtomicInteger` or `synchronized` — `++` isn't atomic |
 | Reaching for `LinkedList` by default | Use `ArrayList`/`ArrayDeque`; better locality |
 | Using `Hashtable` or `synchronizedMap` for concurrency | Use `ConcurrentHashMap` for better scalability |
 
 ## Summary
 
-This page is a rapid-fire lookup for the comparison questions that open Java interviews: reference versus value equality, the string trio, wrapper caching, the collection families, stream operations, exception categories, and the concurrency primitives. The pattern behind good answers is the same — state the distinction in one sentence, give the practical default, and be ready for the deep dive (why `hashCode` matters, why `volatile` isn't atomic, why Java is pass by value). Memorise the tables, then practise saying each answer out loud in under fifteen seconds so it's automatic under pressure.
+This page is a rapid-fire lookup for the comparison questions that open Java interviews: reference versus value equality, the string trio, wrapper caching, the collection families, stream operations, exception categories, and the concurrency primitives. The pattern behind good answers is the same — state the distinction in one sentence, give the practical default, and be ready for the deep dive (why `hashCode` matters, why `volatile` isn't atomic, why module boundaries matter). Memorise the tables, then practise saying each answer out loud in under fifteen seconds so it's automatic under pressure.
 
 ## Top Interview Questions
 
@@ -212,9 +212,9 @@ All three implement `Map`, but differ in ordering and performance. `HashMap` off
 
 Checked exceptions extend `Exception` (but not `RuntimeException`) and the compiler forces you to catch or declare them; they model recoverable, expected conditions outside your control, like `IOException` on a network failure. Unchecked exceptions extend `RuntimeException` and don't have to be declared; they model programming errors such as `NullPointerException`, `IllegalArgumentException` or `IndexOutOfBoundsException` that generally shouldn't be caught and swallowed but fixed. In API design you'd use a checked exception when the caller can reasonably recover and you want to force them to think about it, and unchecked when the failure indicates a bug or a violated precondition. Many modern frameworks (Spring, Hibernate) favour unchecked exceptions to avoid boilerplate `throws` clauses, wrapping checked ones — a common follow-up point.
 
-### Q8. Is Java pass by value or pass by reference?
+### Q8. What are `transient` and `serialVersionUID` in Java serialization?
 
-Java is always pass by value. For primitives, the value itself is copied, so changes inside a method don't affect the caller. For objects, the *reference* is passed by value — the method gets a copy of the pointer, not the variable itself. That's why you can mutate the object through that copied reference (calling a setter changes the shared object the caller also sees), but reassigning the parameter to a new object inside the method has no effect on the caller's variable, because you only changed the local copy of the reference. The precise phrasing "Java passes references by value" is what interviewers want; claiming "pass by reference" is a classic mistake they'll immediately challenge with a swap-method example.
+`transient` marks a field to be skipped by Java's built-in serialization, usually because the value is derived, sensitive, non-serializable, or should be rebuilt after deserialization. `serialVersionUID` is the class-version fingerprint used to decide whether a serialized stream is compatible with the current class definition. If you do not declare one, the JVM computes it from class details, so even harmless-looking refactors can break deserialization with `InvalidClassException`. Declare it explicitly when serialized data may live across deployments. In modern services, prefer JSON or another explicit wire format for APIs, but know these two because old caches, sessions, and messaging systems still use `Serializable`.
 
 ### Q9. What's the difference between `orElse` and `orElseGet` on `Optional`, and why does it matter?
 

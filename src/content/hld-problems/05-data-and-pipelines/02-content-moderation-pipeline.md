@@ -43,7 +43,7 @@ A content moderation pipeline decides whether user-generated content (posts, ima
 | Auto-approved (no human needed) | ~90% | typical for a mature classifier |
 | Routed to human review | ~10% | 20M/day → ~230/s avg needing review |
 | Reviewer throughput | ~150 items/hour/reviewer | assumption based on manual review pace |
-| Reviewers needed | ~1,300 concurrent reviewers | 20M/day ÷ 24h ÷ 150 items/hour, smoothed across shifts |
+| Reviewers needed | ~5,600 concurrent reviewers | 20M/day ÷ 24h ÷ 150 items/hour, before shift coverage and utilization buffers |
 | Appeal rate | ~2% of rejections | assume 5% overall rejection rate × 2% appeal |
 | Storage (audit trail) | ~200M records/day, ~1 KB each ≈ 200 GB/day | every decision logged with reasoning |
 
@@ -72,7 +72,7 @@ Every stage appends a `ModerationDecision` rather than overwriting a single "sta
 
 ## API design
 
-```
+```http
 POST   /v1/content                    Body: { type, payload }              -> { contentId, status: "pending" }
 GET    /v1/content/{id}/status        -> { status, decisions: [...] }
 POST   /v1/review-tasks/{id}/decision Body: { verdict, reason }             -> { taskId, status: "done" }

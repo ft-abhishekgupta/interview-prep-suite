@@ -56,7 +56,7 @@ Search autocomplete suggests completions as a user types, and it has one unforgi
 | TrieNode | children map, isTerminal, cached top-K completions (list of {term, score}) |
 | QueryLog | query_text, user_id (optional), timestamp, result_clicked (raw, high-volume) |
 | TermFrequency | term, count, last_updated (aggregated offline) |
-| TrendingTerm | term, velocity_score, window | for surfacing spikes |
+| TrendingTerm | term, velocity_score, window — used for surfacing spikes |
 
 ```mermaid
 erDiagram
@@ -78,7 +78,7 @@ flowchart TD
 
 ## API design
 
-```
+```http
 GET /v1/autocomplete?prefix={q}&limit=10
     -> { suggestions: [{ text, score }] }
 

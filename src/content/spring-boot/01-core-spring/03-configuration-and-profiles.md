@@ -36,8 +36,8 @@ The single most-asked configuration interview question is *"how do I override a 
 |---|---|---|
 | 1 | Command-line arguments (`--my.app.timeout=10s`) | Ad-hoc overrides |
 | 2 | `SPRING_APPLICATION_JSON` | Inline JSON config |
-| 3 | OS environment variables | Containers, Kubernetes |
-| 4 | Java system properties (`-D`) | JVM-level overrides |
+| 3 | Java system properties (`-D`) | JVM-level overrides |
+| 4 | OS environment variables | Containers, Kubernetes |
 | 5 | Profile-specific external config | Per-env external files |
 | 6 | Profile-specific packaged config | `application-prod.yml` in the jar |
 | 7 | External `application.yml` | Config beside the jar |
@@ -47,9 +47,9 @@ The single most-asked configuration interview question is *"how do I override a 
 
 ```mermaid
 flowchart TD
-    CLI["Command line args"] --> Env["Environment variables"]
-    Env --> Sys["System properties"]
-    Sys --> ProfExt["Profile external config"]
+    CLI["Command line args"] --> Sys["System properties"]
+    Sys --> Env["Environment variables"]
+    Env --> ProfExt["Profile external config"]
     ProfExt --> ProfJar["Profile packaged config"]
     ProfJar --> Ext["External application yml"]
     Ext --> Jar["Packaged application yml"]
@@ -117,7 +117,7 @@ spring:
       prod: [prod-db, prod-cache, metrics]
 ```
 
-Profile-specific files (`application-prod.yml`) load automatically when their profile is active. In Boot 3 the old nested `spring.profiles.include` is gone in favour of `spring.config.activate.on-profile` inside a document, which controls when that document applies.
+Profile-specific files (`application-prod.yml`) load automatically when their profile is active. In modern Boot, use `spring.config.activate.on-profile` inside a YAML document to say when that document applies; `spring.profiles.include` still exists for adding profiles, but it is restricted to non-profile-specific documents, so profile groups are usually clearer.
 
 > [!WARNING]
 > Profile-per-environment (`dev`, `staging`, `prod`) is convenient and common. Profile-per-**feature** (`with-cache`, `no-cache`, `fast-json`) scales badly — the combinations multiply and it becomes impossible to reason about which beans are live. Prefer feature flags or `@ConditionalOnProperty` for feature toggles.
@@ -184,7 +184,7 @@ A refresh is triggered by hitting the `/actuator/refresh` endpoint or by a messa
 
 ## Cheat sheet
 
-- Higher-precedence sources win: CLI args > env vars > system props > profile files > packaged files > defaults.
+- Higher-precedence sources win: CLI args > system props > env vars > profile files > packaged files > defaults.
 - Override in production with an **env var or CLI arg** — never rebuild the image.
 - Relaxed binding: `MY_APP_TIMEOUT` binds to `my.app.timeout`.
 - `@Value` for one-off SpEL and defaults (`${x:default}`); `@ConfigurationProperties` for structured config.
@@ -238,7 +238,7 @@ Never in the repository. A committed secret — in `application.yml`, a properti
 
 ### Q7. What is the property source precedence order, from highest to lowest?
 
-Roughly, highest first: command-line arguments; `SPRING_APPLICATION_JSON` inline JSON; OS environment variables; Java system properties (`-D`); profile-specific external config; profile-specific packaged config; external `application.yml` beside the jar; packaged `application.yml` inside the jar; `@PropertySource` files; and finally hardcoded defaults such as `@Value` fallbacks. The principle to state is that **external, deploy-time sources outrank baked-in ones**, which is what makes a single immutable artifact configurable per environment. You do not need to recite all ten exactly, but you must be able to say env vars and CLI args win over the packaged file.
+Roughly, highest first: command-line arguments; `SPRING_APPLICATION_JSON` inline JSON; Java system properties (`-D`); OS environment variables; profile-specific external config; profile-specific packaged config; external `application.yml` beside the jar; packaged `application.yml` inside the jar; `@PropertySource` files; and finally hardcoded defaults such as `@Value` fallbacks. The principle to state is that **external, deploy-time sources outrank baked-in ones**, which is what makes a single immutable artifact configurable per environment. You do not need to recite all ten exactly, but you must be able to say env vars and CLI args win over the packaged file.
 
 ### Q8. How do you disable or override a specific auto-configuration?
 

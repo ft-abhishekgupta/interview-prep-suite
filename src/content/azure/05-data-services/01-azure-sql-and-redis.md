@@ -43,7 +43,7 @@ flowchart TD
 
 ## High availability and failover groups
 
-- **Zone-redundant HA** (built into General Purpose/Business Critical/Hyperscale tiers) replicates across availability zones within a region for automatic failover on a zone failure, with no application change needed.
+- **Zone-redundant HA** (available on supported Azure SQL service tiers and regions, and explicitly enabled per database/instance) replicates across availability zones within a region for automatic failover on a zone failure, with no application change needed.
 - **Auto-failover groups** add cross-**region** protection: a group of databases replicates to a secondary region, exposed through a stable read-write and read-only listener endpoint, so failover doesn't require changing the connection string — you just point at the group's listener, and Azure redirects it to whichever region is currently primary.
 - **Active geo-replication** is the more granular, single-database building block underneath failover groups — up to 4 readable secondary replicas in different regions, with manual or (via failover groups) automatic failover.
 
@@ -76,12 +76,12 @@ services.AddDbContext<AppDbContext>(options =>
 |---|---|---|---|---|
 | **Basic** | None (single node) | No | No | Dev/test only |
 | **Standard** | 99.9%, two-node replicated | No | No | Simple production caching with basic HA |
-| **Premium** | 99.9%, replicated | Yes (up to 10 shards) | Yes (RDB/AOF), VNet, geo-replication | Production caching needing persistence, clustering, or private networking |
+| **Premium** | 99.9%, replicated | Yes (up to 10 shards) | Yes (RDB/AOF), geo-replication, legacy VNet injection | Production caching needing persistence, clustering, or geo-replication |
 | **Enterprise / Enterprise Flash** | 99.99%, Redis Enterprise (RedisLabs) engine | Yes, larger scale | Yes | Very large datasets, modules (RedisJSON, RediSearch, etc), highest availability |
 
 - **Clustering** (Premium+) shards data across nodes for capacity and throughput beyond a single node's limit; client libraries need cluster-mode support enabled.
 - **Persistence** (RDB snapshots or AOF append-only file, Premium+) lets the cache survive a full restart without becoming a cold cache instantly — important if the cache is also acting as a fast primary store for ephemeral data, not just a lookaside cache.
-- **Private endpoints** (Premium+) put the cache inside your VNet, removing public internet exposure entirely — the default posture for production.
+- **Private endpoints** are supported across Basic, Standard, Premium and Enterprise tiers, and should be paired with disabling public network access where supported; Premium's older VNet-injection feature is separate from Private Link. Private Link is the default posture for production network isolation.
 - **Eviction policies** (`volatile-lru`, `allkeys-lru`, `volatile-ttl`, `noeviction`, etc.) control what happens when memory fills up; `noeviction` causes writes to fail once full, which is correct only if you're using Redis for more than pure caching (e.g. as a queue or session store where losing data silently is worse than an error).
 
 ```csharp
@@ -119,7 +119,7 @@ Redis is never a replacement for Azure SQL's durability and query guarantees —
 - Purchasing models: **DTU** (bundled, simple), **vCore provisioned** (fine-grained, licence reuse), **vCore serverless** (auto-pause, intermittent workloads), **Hyperscale** (independent storage scaling, fast restores at any size).
 - **Auto-failover groups** give a stable endpoint across regions; **active geo-replication** is the underlying single-database building block (up to 4 readable secondaries).
 - Backups enable **PITR** within the retention window; always implement **transient fault retry** (e.g. EF Core `EnableRetryOnFailure`).
-- Redis tiers: **Basic** (dev/test), **Standard** (basic HA), **Premium** (clustering, persistence, VNet), **Enterprise** (highest SLA, modules).
+- Redis tiers: **Basic** (dev/test), **Standard** (basic HA), **Premium** (clustering, persistence, geo-replication), **Enterprise** (highest SLA, modules); Private Link is available across tiers for network isolation.
 - Eviction policy choice matters: `noeviction` fails writes at capacity instead of silently dropping data — right for non-pure-cache use cases.
 - Cache-aside is the default pattern; write-through keeps the cache always warm at the cost of write latency.
 - Redis without persistence is not a source of truth — treat data loss on restart as expected unless persistence is explicitly enabled.
@@ -130,7 +130,7 @@ Redis is never a replacement for Azure SQL's durability and query guarantees —
 |---|---|
 | No retry logic around Azure SQL connections | Enable transient fault handling (e.g. EF Core `EnableRetryOnFailure`) everywhere |
 | Choosing single database for a lift-and-shift needing cross-database queries/SQL Agent | Use Managed Instance instead |
-| Assuming Basic/Standard Redis has clustering or persistence | Only Premium and above offer clustering, persistence, and VNet integration |
+| Assuming Basic/Standard Redis has clustering or persistence | Only Premium and above offer clustering and persistence; use Private Link separately for network isolation |
 | Treating Redis as durable storage without enabling persistence | Enable RDB/AOF if Redis holds anything not trivially recomputable, or accept the data-loss risk explicitly |
 | Using `allkeys-lru` when some keys must never be evicted | Use `volatile-lru`/`volatile-ttl` and only set TTL on genuinely evictable keys |
 | Assuming failover groups change the connection string on failover | The listener endpoint stays constant; that's the entire point |
@@ -167,7 +167,7 @@ PITR lets you restore a database to any specific timestamp within the configured
 
 ### Q7. Compare the Redis tiers on Azure Cache for Redis — what do you actually give up on Basic and Standard?
 
-Basic is a single node with no SLA and no replication — appropriate only for dev/test, since any node restart or failure loses the cache entirely with no failover. Standard adds a two-node replicated setup with a 99.9% SLA, giving basic high availability, but still no clustering (so total memory/throughput is capped to one node's size), no persistence (a full outage loses all data, though replication protects against a single node failure), and no VNet/private endpoint support. Premium is the first tier with clustering (sharding across up to 10 shards for capacity/throughput beyond one node), persistence (RDB/AOF so data survives a full restart), private endpoints/VNet integration, and geo-replication. Enterprise/Enterprise Flash tiers run the Redis Enterprise engine for a 99.99% SLA and support additional modules like RedisJSON and RediSearch. The practical takeaway: any production workload with real availability or data-loss requirements should start at Premium, not Standard.
+Basic is a single node with no SLA and no replication — appropriate only for dev/test, since any node restart or failure loses the cache entirely with no failover. Standard adds a two-node replicated setup with a 99.9% SLA, giving basic high availability, but still no clustering (so total memory/throughput is capped to one node's size) and no persistence (a full outage loses all data, though replication protects against a single node failure). Private endpoints are available across tiers, so don't confuse network isolation with Premium-only clustering/persistence. Premium is the first tier with clustering (sharding across up to 10 shards for capacity/throughput beyond one node), persistence (RDB/AOF so data survives a full restart), legacy VNet injection, and geo-replication. Enterprise/Enterprise Flash tiers run the Redis Enterprise engine for a 99.99% SLA and support additional modules like RedisJSON and RediSearch. The practical takeaway: production workloads with real data-loss or scale-out requirements should start at Premium or Enterprise, while simple cache-aside workloads can sometimes use Standard plus Private Link.
 
 ### Q8. What Redis eviction policies exist, and how do you choose one?
 

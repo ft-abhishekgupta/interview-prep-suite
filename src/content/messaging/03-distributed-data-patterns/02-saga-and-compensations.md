@@ -43,6 +43,10 @@ A database rollback undoes an *uncommitted* change atomically. A compensating ac
 > [!DANGER]
 > Designing a compensation for a step assuming it behaves like a SQL `ROLLBACK` is the most common saga mistake. Ask "what does undoing this look like in the real world?" for every single step before writing code.
 
+The shape to draw on the whiteboard is a forward chain of local transactions with a matching reverse chain of compensations underneath it. A failure at step *n* walks backwards from *n-1* to the start.
+
+![Saga flow with four forward transactions and a reverse chain of compensating transactions beneath them](notes/05-HighLevelDesign/DistributedSystems/image.png)
+
 ## Semantic locks and pending states
 
 Because intermediate saga states are real and visible, you need to prevent other operations from acting on a resource that is "provisionally" committed but might still be compensated. A **semantic lock** is a business-level flag — `status = 'PendingPayment'` — that other operations check before proceeding, rather than a database row lock. It communicates "this is in flux" without blocking the whole table.

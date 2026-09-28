@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [messaging, ordering, partitioning, kafka]
 ---
 
-"Does your queue guarantee ordering?" is a trick question — the honest answer is always "ordering within some scope," never globally. This section covers how that scope is chosen, what it costs you, and how to design systems that don't need ordering at all.
+"Does your queue guarantee ordering?" is a trick question — the honest answer is always "ordering within some scope," never globally. The design skill is choosing that scope, understanding what it costs, and designing systems that do not need ordering at all.
 
 ## Why global ordering does not scale
 

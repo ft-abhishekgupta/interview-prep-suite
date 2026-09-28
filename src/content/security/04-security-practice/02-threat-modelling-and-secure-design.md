@@ -91,7 +91,7 @@ When asked to threat model a design live, the strongest structure to follow out 
 
 ## Worked mini threat model: API + database + queue
 
-Take the diagram above — a public API, an order service, a database, a queue, and a worker calling a third-party payment API.
+For a public API, an order service, a database, a queue, and a worker calling a third-party payment API:
 
 | Trust boundary | Threat (STRIDE) | Mitigation |
 |---|---|---|

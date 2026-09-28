@@ -132,6 +132,8 @@ public class Order {
 
 **Real-world usage:** domain events (`OrderPlaced`, `PaymentFailed`) fanning out to handlers, `java.beans.PropertyChangeListener`/`PropertyChangeSupport` binding a UI to a model, Spring's `ApplicationEvent`/`@EventListener`, reactive streams (`java.util.concurrent.Flow`, Project Reactor, RxJava), and pub-sub message brokers at a larger scale (Kafka topics are Observer distributed across processes).
 
+Observer and pub/sub share the same fan-out intent, but differ in coupling. In in-process Observer, the subject usually holds listener references and calls them directly. In pub/sub, publishers and subscribers are decoupled by a broker or topic; the publisher does not know subscriber identities, delivery can be asynchronous, and messages may cross process boundaries.
+
 > [!WARNING]
 > The classic bug: a long-lived subject (say, a static registry or a cache) holds a **strong reference** to every listener. If a short-lived object (a UI component, a request-scoped service) registers and never removes itself, the subject keeps it alive forever — a **memory leak** the garbage collector cannot fix, because a strong reference from subject to listener is real and reachable. In Java, prefer an explicit `removeListener` call (ideally in a cleanup/`close()` method), a `WeakReference`-based listener list (or `WeakHashMap`), or a `CopyOnWriteArrayList` with disciplined deregistration to guarantee cleanup.
 

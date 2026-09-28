@@ -57,7 +57,7 @@ A distributed job scheduler runs work — cron-style recurring jobs or one-off d
 |---|---|
 | JobDefinition | id, tenant_id, schedule (cron/interval), handler_ref, payload, priority, enabled |
 | JobRun | id, job_id, scheduled_time, status (pending/running/succeeded/failed/retrying), attempt_count, worker_id, heartbeat_at |
-| Lease | job_id, owner_scheduler_id, expires_at | used for leader-election-scoped ownership |
+| Lease | job_id, owner_scheduler_id, expires_at — used for leader-election-scoped ownership |
 | RetryPolicy | job_id, max_attempts, backoff_base, backoff_strategy |
 | TenantQuota | tenant_id, max_concurrent_jobs, priority_weight |
 
@@ -73,7 +73,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST   /v1/jobs                  Body: { schedule, handlerRef, payload, retryPolicy }  -> { jobId }
 PATCH  /v1/jobs/{id}              Body: { enabled: false }                              -> { jobId, enabled }
 GET    /v1/jobs/{id}/runs         -> [{ runId, status, scheduledTime, attempt }]

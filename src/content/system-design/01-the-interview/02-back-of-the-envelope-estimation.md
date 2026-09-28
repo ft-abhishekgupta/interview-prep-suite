@@ -35,7 +35,7 @@ These numbers are the reference table you compare every design decision against.
 | Operation | Approximate latency | Why it matters |
 |---|---|---|
 | L1/L2 CPU cache reference | ~1 ns | Irrelevant at system-design level, but explains why in-process caches are fast |
-| Main memory (RAM) reference | ~100 ns | Redis / in-process cache hits land here |
+| Main memory (RAM) reference | ~100 ns | In-process cache hits land here; Redis adds a network hop but remains far below disk-backed reads |
 | SSD random read | ~0.1 ms | ~100,000 IOPS per device |
 | Network round trip, same data center | ~0.5 ms | Cost of one extra service hop |
 | HDD seek | ~10 ms | Rarely used for hot paths anymore |
@@ -141,7 +141,7 @@ Working set = daily active items x average item size
 
 ## Where the numbers land
 
-Every estimate above is only useful once it is pinned onto an actual architecture — the whole point of computing "500 GB, one database is fine" or "30,000 RPS peak, we need a cache" is to justify a specific box on the diagram you are about to draw. The reference design below is the kind of high-level shape these numbers typically feed into: a load balancer fanning out to stateless services, a cache sitting in front of the primary data store, and async workers peeling off anything that does not need to block the caller — each of those components should trace back to one of the estimates above, not appear because it "sounds like good architecture."
+Every estimate on this page is only useful once it is pinned onto an actual architecture — the whole point of computing "500 GB, one database is fine" or "30,000 RPS peak, we need a cache" is to justify a specific box on the diagram you are about to draw. The reference design is the kind of high-level shape these numbers typically feed into: a load balancer fanning out to stateless services, a cache sitting in front of the primary data store, and async workers peeling off anything that does not need to block the caller — each of those components should trace back to a concrete estimate, not appear because it "sounds like good architecture."
 
 ![alt text](notes/HLD/image.png)
 

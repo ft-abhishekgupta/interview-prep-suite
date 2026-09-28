@@ -146,13 +146,14 @@ public class LruCache<K, V> implements Cache<K, V> {
     private final Node<K, V> tail = new Node<>();
 
     public LruCache(int capacity) {
+        if (capacity <= 0) throw new IllegalArgumentException("capacity must be positive");
         this.capacity = capacity;
         head.next = tail;
         tail.prev = head;
     }
 
     @Override
-    public V get(K key) {
+    public synchronized V get(K key) {
         Node<K, V> node = map.get(key);
         if (node == null) return null;
         moveToFront(node);
@@ -160,7 +161,7 @@ public class LruCache<K, V> implements Cache<K, V> {
     }
 
     @Override
-    public void put(K key, V value) {
+    public synchronized void put(K key, V value) {
         Node<K, V> existing = map.get(key);
         if (existing != null) {
             existing.value = value;
@@ -235,7 +236,7 @@ public class ShardedCache<K, V> implements Cache<K, V> {
     }
 
     @Override
-    public void put(K key, V value) {
+    public synchronized void put(K key, V value) {
         shardFor(key).put(key, value);
     }
 }

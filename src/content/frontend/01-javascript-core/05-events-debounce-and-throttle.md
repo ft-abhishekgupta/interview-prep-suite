@@ -219,7 +219,7 @@ In frameworks, this is exactly why `useEffect` cleanup functions and Angular's `
 ## Cheat sheet
 
 - Events travel capture (down) → target → bubble (up); most listeners use the default bubble phase.
-- `preventDefault` stops the default action; `stopPropagation` stops further travel; `stopImmediatePropagation` does both plus blocks sibling listeners on the same element.
+- `preventDefault` stops the default action; `stopPropagation` stops further travel; `stopImmediatePropagation` stops further travel and later listeners on the same element, but does not cancel the default action.
 - Delegate listeners to a stable ancestor for dynamic lists — one listener, `event.target.closest(...)` to identify the child.
 - `{ passive: true }` on scroll/touch listeners avoids blocking the browser's compositor thread.
 - Debounce = wait for quiet, then fire once. Throttle = fire at most once per fixed window.

@@ -103,9 +103,9 @@ In development only, `<StrictMode>` intentionally calls component bodies, state 
 > [!DANGER]
 > If double-invocation reveals a bug (a counter that increments twice, a subscription that fires twice), the bug was always there — StrictMode did not introduce it. The fix is to make the render function pure and the effect's cleanup correctly symmetrical, not to remove StrictMode.
 
-## Concurrent features: useTransition and useDeferredValue
+## React 18 concurrent features: useTransition and useDeferredValue
 
-Both let you tell React "this update is lower priority than user input", solving the problem of an expensive re-render (e.g., filtering 10,000 rows) freezing the UI while the user types.
+In React 18, both let you tell React "this update is lower priority than user input", solving the problem of an expensive re-render (e.g., filtering 10,000 rows) freezing the UI while the user types.
 
 ```typescript
 const [isPending, startTransition] = useTransition();
@@ -175,7 +175,7 @@ React uses `key` to decide whether a child element is "the same" logical item ac
 
 ### Q5. Explain what React Fiber is and why it was introduced.
 
-Fiber is the reconciliation engine React rewrote in version 16, restructuring the render process from recursive synchronous function calls into a linked-list-like structure of units of work — one fiber node per component instance — that can be processed incrementally. Before Fiber, once reconciliation started on a large tree it ran to completion synchronously, which could block the main thread long enough to make typing or scrolling feel janky. Fiber lets React pause a render, yield back to the browser to handle a higher-priority task like user input, and resume or even discard the paused work if a newer update makes it stale. This incremental, interruptible model is the foundation all of React's concurrent features (`useTransition`, `useDeferredValue`, Suspense for data) are built on.
+Fiber is the reconciliation engine React rewrote in version 16, restructuring the render process from recursive synchronous function calls into a linked-list-like structure of units of work — one fiber node per component instance — that can be processed incrementally. Before Fiber, once reconciliation started on a large tree it ran to completion synchronously, which could block the main thread long enough to make typing or scrolling feel janky. Fiber lets React pause a render, yield back to the browser to handle a higher-priority task like user input, and resume or even discard the paused work if a newer update makes it stale. This incremental, interruptible model is the foundation React 18 concurrent features (`useTransition`, `useDeferredValue`, Suspense for data) are built on.
 
 ### Q6. What changed about batching in React 18 compared to React 17?
 
@@ -195,7 +195,7 @@ No, and this is one of the most common misconceptions. Calling the component fun
 
 ### Q10. Why does React need render-phase purity, and what happens if you break it (e.g., mutate a module-level variable during render)?
 
-Purity is required because the render phase can be paused, thrown away, or run more than once for the same commit — under Fiber's concurrent scheduling, and deliberately in development under StrictMode. If a component mutates external state (a module-level variable, a ref read during render, or an API call with side effects) directly in its function body, that mutation can happen multiple times, at unpredictable moments, or be "undone" if React discards an in-progress render and restarts it — leading to double-counted values, out-of-order side effects, or effects that ran even though their triggering render was abandoned. The fix is always to move any side effect into `useEffect` (or an event handler), which React guarantees runs only after a render has actually been committed, exactly once per matching set of dependencies.
+Purity is required because the render phase can be paused, thrown away, or run more than once for the same commit — under Fiber's concurrent scheduling, and deliberately in development under StrictMode. If a component mutates external state (a module-level variable, a ref read during render, or an API call with side effects) directly in its function body, that mutation can happen multiple times, at unpredictable moments, or be "undone" if React discards an in-progress render and restarts it — leading to double-counted values, out-of-order side effects, or effects that ran even though their triggering render was abandoned. The fix is always to move any side effect into `useEffect` (or an event handler), whose setup runs only after a render has actually been committed and whose cleanup/setup sequence is governed by the dependency array, with React 18 StrictMode intentionally double-checking mount effects in development.
 
 ### Q11. Why does StrictMode call some functions twice in development, and should you turn it off if that breaks your app?
 

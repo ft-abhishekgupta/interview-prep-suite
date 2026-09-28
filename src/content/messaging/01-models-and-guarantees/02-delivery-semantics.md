@@ -13,7 +13,7 @@ Every messaging interview eventually asks "does your system guarantee exactly-on
 |---|---|---|---|
 | At-most-once | Message sent/attempted zero or one times, no retry on failure | Message loss on any error | Cheapest, no dedup needed |
 | At-least-once | Message delivered one **or more** times until acknowledged | Duplicate processing | Requires idempotent consumers |
-| Exactly-once | Message delivered and processed **exactly** one time, no loss, no duplicates | — (the goal) | Only achievable at the processing layer, not the network layer |
+| Effectively-once / exactly-once processing | Message effect is applied **exactly** one time, despite possible duplicate deliveries | Duplicate delivery still possible underneath | Achieved at the processing layer with idempotency or transactions, not as network delivery |
 
 > [!KEY]
 > Exactly-once **delivery** is impossible to guarantee over a network that can drop, delay or duplicate packets. Exactly-once **processing** is achievable — by making the effect of processing idempotent, or by wrapping the read-process-write in a single atomic transaction.
@@ -141,7 +141,7 @@ At-most-once, at-least-once and exactly-once are guarantees about what the *netw
 
 ### Q1. What's the difference between at-most-once, at-least-once and exactly-once delivery?
 
-At-most-once means a message is delivered zero or one times — there's no retry, so a failure anywhere causes silent loss, but there are never duplicates. At-least-once means the sender keeps retrying until it gets a confirmed ack, guaranteeing no loss but allowing the same message to be delivered more than once if an ack is lost after successful processing. Exactly-once means delivered and processed precisely once, with neither loss nor duplication — the ideal, but as I'd explain further, not achievable purely at the delivery layer over an unreliable network; it requires an idempotency or transactional mechanism on top of at-least-once delivery.
+At-most-once means a message is delivered zero or one times — there's no retry, so a failure anywhere causes silent loss, but there are never duplicates. At-least-once means the sender keeps retrying until it gets a confirmed ack, guaranteeing no loss but allowing the same message to be delivered more than once if an ack is lost after successful processing. Plain exactly-once delivery is the impossible ideal over an unreliable network; in real systems the useful target is exactly-once processing, achieved with idempotency or an atomic transaction on top of at-least-once delivery.
 
 ### Q2. Why is exactly-once delivery impossible? Explain using the two-generals problem.
 

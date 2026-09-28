@@ -188,11 +188,14 @@ public class Library {
     }
 
     public void returnItem(BookItem item) {
-        item.release();
         ReservationQueue queue = reservations.get(item.getBook().getIsbn());
-        if (queue != null) {
-            queue.tryDequeue().ifPresent(nextMember -> notifier.notify(nextMember, item.getBook()));
+        Optional<Member> next = queue == null ? Optional.empty() : queue.tryDequeue();
+        if (next.isPresent()) {
+            item.holdFor(next.get()); // not generally available; reserved for the dequeued member
+            notifier.notify(next.get(), item.getBook());
+            return;
         }
+        item.release();
     }
 }
 ```

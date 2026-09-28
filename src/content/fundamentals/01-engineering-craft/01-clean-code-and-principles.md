@@ -109,7 +109,7 @@ public readonly record struct Money(decimal Amount, string Currency) {
 }
 ```
 
-Wrapping a primitive in a type moves validation to one place and makes illegal states unrepresentable — you cannot accidentally add USD to GBP if `Money` refuses to compile that expression through the type system.
+Wrapping a primitive in a type moves validation to one place and catches illegal states at the boundary — for example, `Money` can reject adding USD to GBP in one operator instead of letting that rule be reimplemented inconsistently at every call site.
 
 ## Comments that earn their place
 

@@ -46,7 +46,7 @@ DOM XSS is worth calling out separately because it bypasses the server entirely 
 
 CSP is a response header that tells the browser which sources of script, style, image and connection are allowed to execute — a second layer of defence if an encoding bug slips through.
 
-```
+```http
 Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.example.com;
   object-src 'none'; base-uri 'self'; frame-ancestors 'none';
 ```
@@ -91,7 +91,7 @@ The victim never sees anything happen — the browser just does what forms and c
 |---|---|
 | Synchroniser token pattern | Server embeds a random token per session/form; validated on submit, unknown to the attacker |
 | Double-submit cookie | Token set as a cookie **and** required as a header/body field; attacker can't read the cookie to copy it into the header (assuming no XSS) |
-| `SameSite` cookies | Browser withholds the cookie on cross-site navigations — see below |
+| `SameSite` cookies | Browser withholds the cookie on many cross-site requests; `Lax` blocks classic cross-site form POSTs |
 | Custom header requirement | Simple requests (plain form POST) can't set custom headers; requiring one forces a preflighted CORS request |
 
 ```csharp
@@ -111,7 +111,7 @@ public IActionResult Transfer(TransferModel model) { /* ... */ }
 | `Lax` | Only on top-level navigation (GET) | Modern browser default; blocks cross-site POST |
 | `None` | Always (requires `Secure`) | Needed for legitimate cross-site embeds (widgets, SSO) |
 
-`Lax` is the default in Chrome and Firefox today, which already blocks the classic form-POST CSRF example above — but it does **not** replace anti-forgery tokens, because `Lax` still allows top-level GET navigations to carry cookies, and some frameworks still accept state-changing GETs.
+`Lax` is the default in Chrome and Firefox today, which already blocks classic form-POST CSRF — but it does **not** replace anti-forgery tokens, because `Lax` still allows top-level GET navigations to carry cookies, and some frameworks still accept state-changing GETs.
 
 ## CORS: a browser relaxation, not a server firewall
 
@@ -125,7 +125,7 @@ The same-origin policy is the browser's default: JavaScript on `a.com` cannot re
 | `Access-Control-Allow-Credentials` | Cookies/auth headers may be included |
 | `Access-Control-Request-Method`/`-Headers` | Sent by the browser in the preflight to ask permission |
 
-A **simple request** (GET/HEAD/POST with only standard headers and simple content types) goes straight through, with the browser checking `Access-Control-Allow-Origin` on the response before exposing it to JavaScript. Anything else — custom headers, `PUT`/`DELETE`, `application/json` bodies in some cases — triggers a **preflight**: the browser asks first.
+A **simple request** (GET/HEAD/POST with only standard headers and simple content types) goes straight through, with the browser checking `Access-Control-Allow-Origin` on the response before exposing it to JavaScript. Anything else — custom headers, `PUT`/`DELETE`, or an `application/json` body — triggers a **preflight**: the browser asks first.
 
 ```mermaid
 sequenceDiagram
@@ -152,7 +152,7 @@ sequenceDiagram
 - `SameSite=Lax` is the browser default today; still pair it with anti-forgery tokens.
 - CORS is enforced by the **browser**, not the server — it never replaces authorization.
 - `Allow-Origin: *` + credentials is impossible; echo a validated specific origin instead.
-- Preflight (`OPTIONS`) is triggered by custom headers, non-simple methods, or JSON bodies in some setups.
+- Preflight (`OPTIONS`) is triggered by custom headers, non-simple methods, or `application/json` bodies.
 
 ## Common mistakes
 

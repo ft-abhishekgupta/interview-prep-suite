@@ -63,7 +63,7 @@ A practical mitigation: send a duplicate ("hedged") request to a second replica 
 
 **Little's Law** relates the average number of requests in a system (`L`), the average arrival rate (`λ`), and the average time each request spends in the system (`W`):
 
-```
+```text
 L = λ × W
 ```
 

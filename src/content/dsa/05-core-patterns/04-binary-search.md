@@ -159,7 +159,7 @@ public int minEatingSpeed(int[] piles, int h) {
     int lo = 1, hi = Arrays.stream(piles).max().getAsInt();
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
-        long hoursNeeded = Arrays.stream(piles).mapToLong(p -> (long) Math.ceil((double) p / mid)).sum();
+        long hoursNeeded = Arrays.stream(piles).mapToLong(p -> (p + (long) mid - 1) / mid).sum();
         if (hoursNeeded <= h) hi = mid; else lo = mid + 1;
     }
     return lo;
@@ -182,6 +182,12 @@ Binary search only works when the feasibility predicate is monotonic across the 
 
 > [!DANGER]
 > Binary search on an array that merely "looks roughly sorted" or has more than one rotation point produces wrong answers with no crash — always verify the monotonicity assumption before reaching for binary search, especially on custom predicates.
+
+## Loop invariants to say out loud
+
+Binary search becomes much less error-prone when you attach one invariant to each template. In exact search, `[lo, hi]` is the set of indices that might still contain the target; `lo = mid + 1` and `hi = mid - 1` are safe because `mid` has just been proven not to match. In lower-bound search, `[lo, hi)` always contains the first index where the predicate could become true; `hi = mid` keeps `mid` because it might be the answer, while `lo = mid + 1` discards only values proven false. Upper bound is the same boundary template with a different predicate: `nums[i] > target` instead of `nums[i] >= target`.
+
+For answer-space search, the invariant is over values, not indices: `lo` is still a possible minimum answer, `hi` is a feasible upper bound, and the feasibility predicate flips once. If you cannot state that flip, do not binary search.
 
 ## Search in a 2-D matrix
 
@@ -259,7 +265,7 @@ The template searches `[minPossibleAnswer, maxPossibleAnswer)` with the half-ope
 
 ### Q7. Debugging scenario: your lower-bound binary search is stuck in an infinite loop. What's the likely bug?
 
-The most common cause is writing `hi = mid - 1` in the "keep searching to the left" branch of a half-open `[lo, hi)` template — this is a closed-range idiom leaking into a half-open loop. In the half-open template, `mid` itself might be a valid answer, so the correct update is `hi = mid`, never `mid - 1`; using `mid - 1` in a `while (lo < hi)` loop can cause `lo` and `hi` to converge incorrectly or, if `mid == lo`, to never advance `hi` past `lo` correctly, sometimes leaving the loop condition permanently true. The fix is to keep the two templates (closed-range with `<=` and `mid ± 1`, versus half-open with `<` and `hi = mid`) strictly separate and never mix their update rules.
+The most common cause is failing to shrink the search interval on every branch — for example, writing `lo = mid` instead of `lo = mid + 1` in a half-open `[lo, hi)` lower-bound template when `mid == lo`. A related bug is writing `hi = mid - 1` in the "keep searching left" branch: that usually terminates, but it can skip the correct boundary because `mid` itself might be the first valid index. The fix is to keep the templates separate: closed-range search uses `while (lo <= hi)` with `mid ± 1`, while half-open boundary search uses `while (lo < hi)`, `lo = mid + 1`, and `hi = mid`.
 
 ### Q8. How would you search for a target in a fully sorted 2-D matrix (each row sorted, and the first element of each row greater than the last element of the previous row)?
 

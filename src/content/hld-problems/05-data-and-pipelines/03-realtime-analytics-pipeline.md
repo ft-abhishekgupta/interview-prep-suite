@@ -50,7 +50,7 @@ The shape of the problem — clicks in, aggregated metrics out — is simple to 
 | Aggregation window | 1 minute (tumbling), rolled up to hourly/daily | balances latency vs. overhead |
 | Late-arrival tolerance | up to 5 minutes | watermark lag budget |
 | Storage (raw events, retained) | ~2 TB/day | 10B × 200 bytes |
-| Storage (aggregates) | orders of magnitude smaller | 10M keys × 1440 minutes × small record ≈ tens of GB/day |
+| Storage (aggregates) | ~230–460GB/day worst-case before sparsity/rollups | 10M keys × 1440 minute windows × ~16–32B compressed records |
 
 > [!TIP]
 > Say the ratio out loud: *"Raw events are roughly 2 TB/day, but the aggregated output is orders of magnitude smaller — that gap is exactly why we pre-aggregate rather than making the dashboard scan raw events."*
@@ -76,7 +76,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST  /v1/events                       Body: { key, eventTime, value }   -> 202 Accepted (fire-and-forget, high volume)
 GET   /v1/aggregates?key={k}&window=1m&start=..&end=..  -> [{ windowStart, count, sum }]
 GET   /v1/rollups?key={k}&granularity=hour&date=..      -> [{ hour, value }]
@@ -143,14 +143,26 @@ flowchart LR
 Stream processing frameworks generally guarantee **at-least-once** delivery of events into your aggregation logic (a consumer can crash and reprocess a batch after restart). If the aggregation is a blind `count += 1`, a reprocessed batch double-counts. The fix is making the aggregate update **idempotent**.
 
 ```sql
--- Idempotent upsert keyed by (key, window_start) with a per-event dedup token
-INSERT INTO windowed_aggregate (key, window_start, count, sum, last_event_id)
-VALUES (@key, @windowStart, @deltaCount, @deltaSum, @eventId)
+-- Framework/checkpoint pattern: write the full window result for a checkpoint.
+-- Replaying the same checkpoint writes the same value, not count += 1 again.
+INSERT INTO windowed_aggregate (key, window_start, count, sum, checkpoint_id)
+VALUES (@key, @windowStart, @fullCount, @fullSum, @checkpointId)
 ON CONFLICT (key, window_start) DO UPDATE SET
-    count = windowed_aggregate.count + EXCLUDED.count,
-    sum = windowed_aggregate.sum + EXCLUDED.sum
-WHERE NOT (@eventId <= windowed_aggregate.last_event_id); -- skip if already applied
+    count = EXCLUDED.count,
+    sum = EXCLUDED.sum,
+    checkpoint_id = EXCLUDED.checkpoint_id
+WHERE windowed_aggregate.checkpoint_id < EXCLUDED.checkpoint_id;
 ```
+
+If you are not relying on a framework's checkpointed state, use an explicit dedup table/cache keyed by `event_id`:
+
+```sql
+INSERT INTO applied_events (event_id) VALUES (@eventId)
+ON CONFLICT DO NOTHING;
+-- only increment the aggregate if the insert above affected one row
+```
+
+A single `last_event_id` column is not a safe dedup mechanism for out-of-order events unless IDs are strictly monotonic within each `(key, window)`, which click/event streams generally do not guarantee.
 
 - Many stream engines (Flink with checkpointing, Kafka Streams with exactly-once semantics) instead achieve this via **transactional writes tied to checkpoint offsets**: the framework only commits the consumer offset *and* the aggregate update together, atomically, so a crash-and-restart replays exactly the events that weren't yet durably reflected in the aggregate — no more, no less.
 - The practical takeaway: "exactly-once" in stream processing almost always means **at-least-once delivery + idempotent application**, the same pattern as the job scheduler and moderation pipeline designs — not a magical network-level guarantee.
@@ -209,7 +221,7 @@ Put together — ingestion, partitioned stream, windowed stream processing, idem
 - **Serving layer read load** — dashboards querying long historical ranges should read from rollups, not raw minute-level aggregates; cache very recent/hot-key aggregates aggressively since they're queried disproportionately often.
 - **Reprocessing cost** — a full backfill over billions of archived events is expensive; scope reprocess jobs to the specific key range and time range affected by the bug/change, not the entire dataset, whenever possible.
 
-Scaling the whole pipeline to a higher target throughput (say, 10,000+ events/sec sustained) is mostly a matter of scaling each stage independently rather than any single silver bullet: the ingestion tier scales horizontally since it's stateless, the stream (Kinesis/Kafka) is sharded by key with each shard handling its own bounded throughput, the stream processor runs one parallel task per shard, and the OLAP serving store scales largely on its own but benefits from being partitioned by a dimension like advertiser ID to keep any one partition's query load bounded:
+Scaling the whole pipeline to a higher target throughput (say, 1M+ events/sec sustained) is mostly a matter of scaling each stage independently rather than any single silver bullet: the ingestion tier scales horizontally since it's stateless, the stream (Kinesis/Kafka) is sharded by key with each shard handling its own bounded throughput, the stream processor runs one parallel task per shard, and the OLAP serving store scales largely on its own but benefits from being partitioned by a dimension like advertiser ID to keep any one partition's query load bounded:
 
 ![alt text](notes/HLD/Problems/AdClickAggregator/image-4.png)
 
@@ -296,12 +308,8 @@ For tumbling windows, the watermark simply needs to pass a single window's end b
 
 ### Q11. What would change about this design if the requirement shifted from "aggregate counts for a dashboard" to "aggregate counts that directly drive advertiser billing"?
 
-Billing-critical numbers raise the bar on correctness substantially beyond "good enough for a dashboard trend line" — you'd want a lambda-style independent batch reconciliation layer even if the primary path is kappa-style streaming, specifically so there's a separate, simpler, more auditable code path that recomputes the authoritative numbers from raw archived events (e.g., nightly) and flags any discrepancy against the streaming numbers before invoices go out. You'd also tighten the idempotency and dedup story around the raw event ingestion itself (e.g., a signed, unique impression ID per ad shown, checked against a dedup cache) to prevent click-fraud or accidental duplicate submission from directly translating into inflated bills, and you'd likely widen the allowed-lateness window or add an explicit "finalization" delay before a day's numbers are considered billable, trading a bit more latency for materially higher confidence in correctness.
+Billing-critical numbers raise the bar on correctness substantially beyond "good enough for a dashboard trend line" — you'd want a lambda-style independent batch reconciliation layer even if the primary path is kappa-style streaming, specifically so there's a separate, simpler, more auditable code path that recomputes the authoritative numbers from raw archived events (e.g., nightly) and flags any discrepancy against the streaming numbers before invoices go out. You'd also tighten the idempotency and dedup story around the raw event ingestion itself with a signed, unique impression ID per ad shown, checked against a dedup cache; deduping on `(user_id, ad_id)` is too coarse because legitimate repeat impressions should count separately. You'd likely widen the allowed-lateness window or add an explicit "finalization" delay before a day's numbers are considered billable, trading a bit more latency for materially higher confidence in correctness.
 
 ### Q12. How do you decide the right tumbling window size (1 minute vs. 5 minutes vs. 1 hour) for this pipeline?
 
 The window size is a trade-off between granularity/latency and overhead: smaller windows (1 minute) give more granular, near-real-time visibility and let dashboards show fresher trend data, but create more distinct aggregate records and more frequent finalization events, increasing storage and processing overhead proportionally. Larger windows (1 hour) reduce that overhead and are fine for use cases that don't need minute-level granularity, but delay when any given time period's number becomes visible at all, and dilute the ability to detect a short-lived spike. A common approach is to compute at the finest granularity actually needed by any consumer (often 1 minute) and then roll those up into coarser aggregates for other consumers, rather than trying to pick one single window size that serves every use case directly.
-
-### Q13. How do you stop a single user's repeated clicks on the same ad from inflating the count, without incorrectly blocking legitimate repeat views?
-
-The naive fix — tag each click with the user's ID and dedupe on `(user_id, ad_id)` — is wrong on two fronts: it forces the user to be identified/logged in, which isn't always true, and it would incorrectly collapse two entirely legitimate clicks from the same user seeing the same ad on two different occasions into one. The correct mechanism operates one level up, at the impression rather than the user: every time an ad is actually rendered in a browser, the system generates a unique, signed impression ID for that specific showing, which is echoed back if the user clicks. The click processor verifies the signature and checks that exact impression ID against a dedup cache — a second click event carrying the same impression ID is a retried or replayed event and gets dropped, while a click carrying a fresh impression ID is a genuinely new click and counts, even if it's the same user clicking the same ad for the second time that day.

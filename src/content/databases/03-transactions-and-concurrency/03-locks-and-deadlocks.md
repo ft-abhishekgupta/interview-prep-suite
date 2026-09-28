@@ -21,7 +21,7 @@ A lock is a claim a transaction takes on a piece of data so that conflicting tra
 | Shared | S | Reads (`SELECT`) | Writers, not other readers |
 | Update | U | Rows a statement might update (`UPDATE ... WHERE`) | Prevents two readers both upgrading to X and deadlocking each other |
 | Exclusive | X | Writes (`INSERT`/`UPDATE`/`DELETE`) | Everyone |
-| Intent (IS/IX/SIX) | I* | Signals "I hold a lock somewhere below this level" | Nothing directly — lets the engine skip scanning every row to check for conflicts |
+| Intent (IS/IX/SIX) | I* | Signals "I hold a lock somewhere below this level" | Usually not ordinary row locks, but it conflicts with incompatible table-level requests — lets the engine skip scanning every row |
 
 Compatibility of the core modes when two transactions want the **same row**:
 
@@ -188,7 +188,7 @@ A query that can be satisfied entirely from an index (a "covering" index contain
 
 ### Q11. Should an application ever just retry on any exception to "fix" deadlocks?
 
-No — retries should be scoped to the specific error that indicates the transaction was chosen as a deadlock victim (error 1205 in SQL Server, SQLSTATE 40P01 in Postgres/MySQL), with a small randomized backoff to avoid immediately re-colliding with the same competitor. Retrying on arbitrary exceptions is dangerous: a constraint violation, a business-rule failure, or a genuine bug will simply fail again identically, waste connections/threads, and mask the real problem from monitoring. The retry wrapper should also cap attempts (e.g., 3) and log every retry so persistent deadlocking on a hot code path gets noticed rather than silently absorbed forever.
+No — retries should be scoped to the specific error that indicates the transaction was chosen as a deadlock victim (error 1205 in SQL Server, SQLSTATE 40P01 in Postgres, or MySQL error 1213 / SQLSTATE 40001), with a small randomized backoff to avoid immediately re-colliding with the same competitor. Retrying on arbitrary exceptions is dangerous: a constraint violation, a business-rule failure, or a genuine bug will simply fail again identically, waste connections/threads, and mask the real problem from monitoring. The retry wrapper should also cap attempts (e.g., 3) and log every retry so persistent deadlocking on a hot code path gets noticed rather than silently absorbed forever.
 
 ### Q12. Can a deadlock happen between a single transaction and itself, or only between two or more sessions?
 

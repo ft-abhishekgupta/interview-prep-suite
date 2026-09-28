@@ -98,10 +98,10 @@ Focusing on just the four outer/inner variants, the shaded region of each pair o
 
 ```mermaid
 flowchart LR
-    E["Employees<br/>(5 rows)"] -->|"INNER: 4 matched"| R1["4 rows"]
-    E -->|"LEFT: 4 matched + 1 unmatched"| R2["5 rows"]
-    D["Departments<br/>(3 rows)"] -->|"RIGHT: 4 matched + 1 empty dept"| R3["5 rows"]
-    E -->|"CROSS: 5 x 3"| R4["15 rows"]
+    E["Employees<br/>(4 rows)"] -->|"INNER: 3 matched employee rows"| R1["3 rows"]
+    E -->|"LEFT: 3 matched + 1 unassigned"| R2["4 rows"]
+    D["Departments<br/>(3 rows)"] -->|"RIGHT: 3 matched employee rows + 1 empty dept"| R3["4 rows"]
+    E -->|"CROSS: 4 x 3"| R4["12 rows"]
 ```
 
 `RIGHT JOIN` is rarely used in practice — rewriting `A RIGHT JOIN B` as `B LEFT JOIN A` is equivalent and reads more naturally left-to-right. `FULL JOIN` is not supported in MySQL; emulate with `LEFT JOIN UNION RIGHT JOIN`.
@@ -169,7 +169,7 @@ Query A still returns every employee — non-Engineering employees just show `NU
 | Runs | Before grouping | After grouping |
 | Filters | Individual rows | Aggregated groups |
 | Can use aggregates | No | Yes |
-| Can use column aliases | No (mostly) | Yes (varies by engine) |
+| Can use column aliases | No | Usually no in SQL Server/Postgres; MySQL varies, so repeat the aggregate for portability |
 
 ```sql
 -- Departments with more than 1 active employee, average salary above 50000
@@ -265,7 +265,7 @@ For an inner join, the two are equivalent because non-matching rows are dropped 
 
 ### Q4. What is the difference between COUNT(*), COUNT(column), and COUNT(DISTINCT column)?
 
-`COUNT(*)` counts every row in the group regardless of `NULL`s. `COUNT(column)` counts only rows where that column is non-`NULL`. `COUNT(DISTINCT column)` counts distinct non-`NULL` values, collapsing duplicates. They can all return different numbers on the same table: given rows `(1), (1), (NULL), (2)`, `COUNT(*) = 4`, `COUNT(col) = 3`, `COUNT(DISTINCT col) = 2`.
+`COUNT(*)` counts physical rows in the group and does not care which columns are `NULL`, because it is counting rows, not values. `COUNT(column)` counts only rows where that specific column is non-`NULL`, so it is the right tool for "how many rows have a value for this attribute" but the wrong one for total row count if the column is nullable. `COUNT(DISTINCT column)` first removes duplicate non-`NULL` values and then counts the remaining values. They can all differ on the same data: for values `(1), (1), (NULL), (2)`, `COUNT(*) = 4`, `COUNT(col) = 3`, and `COUNT(DISTINCT col) = 2`. This distinction matters in outer joins, where right-side columns may be `NULL` for unmatched rows.
 
 ### Q5. Why doesn't a join predicate match two NULL values?
 
@@ -294,7 +294,7 @@ To get the actual duplicate rows (not just the count), join back to the base tab
 
 ### Q9. Why can't you reference a SELECT column alias in the WHERE clause?
 
-Because of logical processing order: `WHERE` executes before `SELECT`, so the alias does not exist yet when `WHERE` is evaluated — the engine literally has not computed it. You must repeat the underlying expression in `WHERE` (or wrap the query in a CTE/subquery and filter the outer query, where the alias *does* exist because the inner `SELECT` has already run). `ORDER BY` and `HAVING` (in most engines) can use aliases because they run after `SELECT`.
+Because of logical processing order: `WHERE` executes before `SELECT`, so the alias does not exist yet when `WHERE` is evaluated — the engine literally has not computed it. You must repeat the underlying expression in `WHERE`, or wrap the query in a CTE/derived table and filter the outer query, where the alias is now an ordinary column. `ORDER BY` can use a `SELECT` alias because it logically runs later. Do not rely on aliases in `HAVING` for portable SQL: SQL Server and Postgres generally require you to repeat the aggregate expression, while MySQL is more permissive.
 
 ### Q10. What is the difference between an inner join and a semi-join, and how do you write one in T-SQL?
 
@@ -306,7 +306,7 @@ Standard SQL (and SQL Server) rejects it at parse time with an error like "colum
 
 ### Q12. How would you write a query to find departments with no employees?
 
-Use a `LEFT JOIN` from the "should have matches" side and filter for the missing side, or use `NOT EXISTS`:
+Use a `LEFT JOIN` from the complete set of departments and filter for the missing employee row, or use `NOT EXISTS`:
 
 ```sql
 SELECT d.department_name
@@ -320,7 +320,7 @@ FROM departments d
 WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.department_id);
 ```
 
-Avoid `NOT IN (SELECT department_id FROM employees)` here — if even one `employee_id`/`department_id` in the subquery is `NULL`, `NOT IN` returns an empty result set for every row, a well-known trap covered in more detail alongside subqueries.
+The `LEFT JOIN` version works because an unmatched department manufactures a row where every employee column is `NULL`, so `WHERE e.employee_id IS NULL` keeps exactly those departments. The `NOT EXISTS` version is often clearer because it states the intention directly and does not risk accidental row multiplication from a join. Avoid `NOT IN (SELECT department_id FROM employees)` here unless the subquery filters out `NULL` department IDs: one `NULL` in the subquery list makes every comparison evaluate to `UNKNOWN`, so the query can return no departments at all. Prefer `NOT EXISTS` for this pattern in interviews and production code.
 
 ### Q13. When is DISTINCT the same as GROUP BY, and when should you use one over the other?
 

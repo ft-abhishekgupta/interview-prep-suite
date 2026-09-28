@@ -46,12 +46,12 @@ The functional shape — upload, process, watch, count — is simple enough to s
 | DAU | 100M | given, YouTube-scale |
 | Uploads/day | 500,000 | given |
 | Avg upload size | 200 MB (raw) | assumption for a few minutes of HD source |
-| Upload ingest bandwidth | ~1.16 GB/s avg | 500,000 × 200 MB ÷ 86,400 s |
+| Upload ingest bandwidth | ~1.16 GB/s avg (~9.3 Gbps) | 500,000 × 200 MB ÷ 86,400 s |
 | Views/day | 5 billion | given |
 | View QPS (avg / peak) | ~58,000/s avg, ~230,000/s peak | 5B ÷ 86,400 s; ×4 for peak hours |
 | Read:write ratio | ~10,000:1 | 5B views vs. 500K uploads |
 | Transcoded storage per video | ~3–5x raw size | multiple resolutions (240p–4K) + audio tracks |
-| Total storage growth/day | ~600 TB–1 PB | 500,000 × 200 MB raw × ~4x for renditions |
+| Total storage growth/day | ~300–500 TB renditions, ~400–600 TB including raw | 500,000 × 200 MB raw × ~3–5x renditions |
 | CDN egress | dominant cost | most bytes never touch origin storage after first view |
 
 > [!TIP]
@@ -85,7 +85,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 POST   /v1/uploads/initiate         Body: { title, sizeBytes }        -> { uploadId, chunkUrls[] }
 PUT    /v1/uploads/{id}/chunks/{n}  Body: <binary chunk>               -> 200 OK
 POST   /v1/uploads/{id}/complete    ->  { videoId, status: "processing" }
@@ -177,7 +177,7 @@ Rather than picking one quality and hoping the network holds up, the player cont
 
 A manifest lists every available rendition and the URLs of its segments:
 
-```
+```text
 #EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=426x240
 240p/index.m3u8

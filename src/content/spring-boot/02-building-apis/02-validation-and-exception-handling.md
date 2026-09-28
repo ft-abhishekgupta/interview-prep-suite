@@ -36,13 +36,13 @@ The three "emptiness" constraints trip up candidates, so state the difference pr
 
 ## @Valid versus @Validated
 
-This is the distinction interviewers love. They trigger different code paths and different exceptions, and mishandling the split is the single most common validation bug in Spring apps. `@Valid` is the standard annotation that Spring's argument resolver honors when binding a `@RequestBody`; `@Validated` is Spring's own annotation that, placed on a class, wraps the bean in an AOP proxy so that constraints on individual method parameters are enforced on every call.
+This is the distinction interviewers love. They trigger different code paths and different exceptions, and mishandling the split is the single most common validation bug in Spring apps. `@Valid` is the standard annotation that Spring's argument resolver honors when binding a `@RequestBody`; `@Validated` is Spring's own annotation for validation groups and, on service classes, method-level validation through a proxy. In modern Spring MVC (Framework 6.1+), controller method-parameter validation is handled by MVC itself and raises `HandlerMethodValidationException`; service-layer method validation still typically raises `ConstraintViolationException`.
 
 | Aspect | `@Valid` on `@RequestBody` | `@Validated` on the class + params |
 |---|---|---|
 | Source | `jakarta.validation` | Spring's `@Validated` |
 | Triggers | body binding validation | method-level validation via proxy |
-| Exception | `MethodArgumentNotValidException` | `ConstraintViolationException` |
+| Exception | `MethodArgumentNotValidException` | `HandlerMethodValidationException` for MVC controllers; `ConstraintViolationException` for proxied service methods |
 | Supports groups | no | yes |
 | Typical use | request DTOs | `@RequestParam`/`@PathVariable`, service methods |
 
@@ -54,12 +54,12 @@ class UserController {
   UserDto create(@RequestBody @Valid CreateUser cmd) { ... }   // MethodArgumentNotValidException
 
   @GetMapping("/users")
-  List<UserDto> list(@RequestParam @Min(1) int page) { ... }   // ConstraintViolationException
+  List<UserDto> list(@RequestParam @Min(1) int page) { ... }   // parameter-validation exception
 }
 ```
 
 > [!WARNING]
-> `@Valid` on a `@RequestBody` gives `MethodArgumentNotValidException` with `BindingResult` field errors. `@Validated` on the class validating a `@RequestParam` gives a `ConstraintViolationException` with no `BindingResult`. Your global handler must handle both or one class of validation errors will fall through as a raw 500.
+> `@Valid` on a `@RequestBody` gives `MethodArgumentNotValidException` with `BindingResult` field errors. Constraints on controller method parameters give `HandlerMethodValidationException` on Spring MVC 6.1+ (older or proxied method-validation paths may give `ConstraintViolationException`). Your global handler must cover all of these or one class of validation errors will fall through as a raw 500.
 
 ## Validation groups and custom validators
 
@@ -196,7 +196,7 @@ mockMvc.perform(post("/users").contentType(APPLICATION_JSON).content("{}"))
 
 - `@NotNull` allows empty; `@NotEmpty` also rejects empty; `@NotBlank` also rejects whitespace-only strings.
 - `@Valid` cascades into nested objects and collection elements.
-- `@Valid` on a body throws `MethodArgumentNotValidException`; `@Validated` method params throw `ConstraintViolationException`.
+- `@Valid` on a body throws `MethodArgumentNotValidException`; method params throw `HandlerMethodValidationException` in modern MVC or `ConstraintViolationException` through AOP validation.
 - Groups let one DTO enforce create-versus-update rules.
 - Centralize handling in one `@RestControllerAdvice`; extend `ResponseEntityExceptionHandler` for framework exceptions.
 - Use RFC 7807 `ProblemDetail`; enable `spring.mvc.problemdetails.enabled=true`.
@@ -208,7 +208,7 @@ mockMvc.perform(post("/users").contentType(APPLICATION_JSON).content("{}"))
 
 | Mistake | Fix |
 |---|---|
-| Handling only `MethodArgumentNotValidException` | Also handle `ConstraintViolationException` from `@Validated` |
+| Handling only `MethodArgumentNotValidException` | Also handle `HandlerMethodValidationException` and `ConstraintViolationException` |
 | Forgetting `@Valid` on nested objects | Add `@Valid` to cascade into them |
 | Returning raw exception messages to clients | Return a code plus a safe, generic message |
 | `@Validated` missing at class level | Add it so `@RequestParam`/path constraints fire |
@@ -217,7 +217,7 @@ mockMvc.perform(post("/users").contentType(APPLICATION_JSON).content("{}"))
 
 ## Summary
 
-Jakarta Bean Validation declares constraints on DTOs, and `@Valid` cascades them into nested structures. The subtle exam question is the split between `@Valid` on a body producing `MethodArgumentNotValidException` and `@Validated` method parameters producing `ConstraintViolationException` — a good handler covers both. Centralize error mapping in one `@RestControllerAdvice`, return RFC 7807 `ProblemDetail` with a machine-readable code, field errors and a correlation id, and never leak stack traces or SQL. Validate configuration at startup, handle idempotency explicitly, and log once at the boundary. That combination gives a clean, consistent, auditable error contract.
+Jakarta Bean Validation declares constraints on DTOs, and `@Valid` cascades them into nested structures. The subtle exam question is the split between body validation producing `MethodArgumentNotValidException` and method-parameter validation producing `HandlerMethodValidationException` in modern MVC or `ConstraintViolationException` in proxied service validation — a good handler covers all of them. Centralize error mapping in one `@RestControllerAdvice`, return RFC 7807 `ProblemDetail` with a machine-readable code, field errors and a correlation id, and never leak stack traces or SQL. Validate configuration at startup, handle idempotency explicitly, and log once at the boundary. That combination gives a clean, consistent, auditable error contract.
 
 ## Top Interview Questions
 
@@ -227,7 +227,7 @@ Jakarta Bean Validation declares constraints on DTOs, and `@Valid` cascades them
 
 ### Q2. What is the difference between @Valid and @Validated?
 
-`@Valid` is standard Jakarta Bean Validation. On a `@RequestBody` parameter it triggers validation during data binding and, on failure, throws `MethodArgumentNotValidException` carrying a `BindingResult` of field errors. `@Validated` is Spring's variant. Placed on a class, it enables method-level validation through an AOP proxy, so constraints on `@RequestParam`, `@PathVariable` or service-method arguments are enforced, throwing `ConstraintViolationException` on failure. `@Validated` also supports validation groups, which `@Valid` does not. In practice you use `@Valid` for request bodies and `@Validated` at class level to validate individual parameters or to select groups. Handle both exception types in your advice.
+`@Valid` is standard Jakarta Bean Validation. On a `@RequestBody` parameter it triggers validation during data binding and, on failure, throws `MethodArgumentNotValidException` carrying a `BindingResult` of field errors. `@Validated` is Spring's variant for validation groups and method validation. Placed on a service class, it enables method-level validation through an AOP proxy and failures usually surface as `ConstraintViolationException`; in Spring MVC 6.1+ controller method-parameter constraints are handled by MVC and surface as `HandlerMethodValidationException`. In practice you use `@Valid` for request bodies, `@Validated(SomeGroup.class)` when you need groups, and handlers for all relevant validation exception types.
 
 ### Q3. How do you validate nested objects and collections?
 
@@ -243,7 +243,7 @@ RFC 7807 defines a standard `application/problem+json` error format with fields 
 
 ### Q6. A client sends an invalid query parameter but gets a 500 instead of 400. Why?
 
-Almost certainly the constraint is on a `@RequestParam` or `@PathVariable`, which requires `@Validated` at the class level to be enforced, and when it fires it throws `ConstraintViolationException` rather than `MethodArgumentNotValidException`. If your `@RestControllerAdvice` only handles `MethodArgumentNotValidException`, the `ConstraintViolationException` falls through to the default handler as a `500`. Two fixes: ensure `@Validated` is present on the controller class so the constraint actually runs, and add an `@ExceptionHandler(ConstraintViolationException.class)` that maps to `400` and extracts the violations into your standard error body. This mismatch is one of the most common validation bugs in Spring apps.
+Almost certainly the constraint is on a `@RequestParam` or `@PathVariable`, not on the request body. Body validation failures are `MethodArgumentNotValidException`, while method-parameter validation failures are `HandlerMethodValidationException` in modern Spring MVC or `ConstraintViolationException` on older/proxied paths. If your `@RestControllerAdvice` only handles `MethodArgumentNotValidException`, the parameter-validation exception can fall through as a `500`. Fix it by enabling parameter validation where needed and by adding handlers for `HandlerMethodValidationException` and `ConstraintViolationException` that map to `400` and extract violations into your standard error body. This mismatch is one of the most common validation bugs in Spring apps.
 
 ### Q7. How do you stop stack traces and SQL from leaking to clients?
 

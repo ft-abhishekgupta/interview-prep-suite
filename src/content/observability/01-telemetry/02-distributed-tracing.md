@@ -35,7 +35,7 @@ Each span carries: a `span_id`, its `parent_span_id`, a `trace_id` shared by the
 
 For the tree to connect across process boundaries, the trace context must travel with the request. The W3C standard header is `traceparent`:
 
-```
+```http
 traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
              ^^ version   ^^ trace-id (32 hex)     ^^ parent span-id  ^^ flags
 ```
@@ -110,7 +110,7 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()   // auto: incoming HTTP spans
         .AddHttpClientInstrumentation()   // auto: outgoing HTTP spans + traceparent injection
-        .AddSource("OrderService")        // custom ActivitySource below
+        .AddSource("OrderService")        // custom ActivitySource used by manual spans
         .AddOtlpExporter());
 
 // Manual span for custom work, e.g. around a queue publish

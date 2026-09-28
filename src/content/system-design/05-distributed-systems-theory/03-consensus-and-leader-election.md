@@ -77,7 +77,7 @@ You are extremely unlikely to be asked to implement Raft in an interview — you
 | **etcd** | Raft | Flat key-value store with leases and watches | Kubernetes' own metadata store, leader election, distributed locks, service discovery |
 | **Consul** | Raft | Key-value + native service mesh/discovery | Service discovery, health checking, config, locks |
 
-Both ZooKeeper and etcd expose the same practical primitives on top of consensus: **strongly consistent reads/writes**, **ephemeral/lease-based keys** that disappear if a client dies (the basis of leader election and locks), and a **watch** mechanism so clients are notified of changes instead of polling.
+ZooKeeper and etcd expose the same practical coordination primitives on top of consensus: **ephemeral/lease-based keys** that disappear if a client dies (the basis of leader election and locks), and a **watch** mechanism so clients are notified of changes instead of polling. etcd offers linearizable reads and writes when you use quorum reads; ZooKeeper writes are totally ordered, while ordinary reads are session/sequentially consistent and can be stale unless the client uses `sync` or otherwise reads from a fresh server.
 
 ```mermaid
 flowchart LR
@@ -159,7 +159,7 @@ Both solve the same fundamental problem — a majority of nodes agreeing on a se
 
 ### Q7. What practical primitives do ZooKeeper and etcd expose that make them usable for leader election and locking, without an application implementing Raft itself?
 
-Both expose lease- or session-bound keys (etcd leases, ZooKeeper ephemeral znodes) that automatically disappear if the owning client's connection or heartbeat stops, which is exactly the "release the lock/step down as leader if I die" behavior applications need without having to detect and handle that failure themselves. Both also expose a watch mechanism, letting other clients be notified immediately when a key changes or disappears, rather than polling — critical for fast leader failover and lock hand-off. Because reads and writes to these stores are themselves strongly consistent (backed by the underlying consensus protocol), an application can trust that "I successfully created this znode/lease" means it genuinely, uniquely holds it, without needing to reason about consensus itself.
+Both expose lease- or session-bound keys (etcd leases, ZooKeeper ephemeral znodes) that automatically disappear if the owning client's connection or heartbeat stops, which is exactly the "release the lock/step down as leader if I die" behavior applications need without having to detect and handle that failure themselves. Both also expose a watch mechanism, letting other clients be notified immediately when a key changes or disappears, rather than polling — critical for fast leader failover and lock hand-off. The key distinction is read semantics: etcd can serve linearizable quorum reads, while ZooKeeper's ordinary reads are session/sequentially consistent and may be stale unless synchronized. For lock acquisition, a successful create/lease operation is still uniquely ordered by the consensus-backed write path, so the application does not implement consensus itself.
 
 ### Q8. Why is it considered risky or naive to design your own leader election protocol from scratch (e.g. "nodes ping each other and the one with the lowest ID wins")?
 

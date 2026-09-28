@@ -13,7 +13,7 @@ The single biggest mistake is optimising the part of the system you *assume* is 
 
 Amdahl's law formalises why this matters: the speed-up from optimising one part of a system is capped by how much time that part actually consumes.
 
-```
+```text
 Speedup = 1 / ((1 - P) + P / S)
 ```
 
@@ -68,13 +68,13 @@ dotnet-trace collect --process-id 1234 --providers Microsoft-DotNETCore-SamplePr
 
 Allocating too much, too often, forces the garbage collector to run constantly, and every GC pause steals CPU from real work. `dotnet-counters` surfaces `% Time in GC` and `Gen 0/1/2` collection rates live; a healthy service spends well under 5-10% of CPU time in GC.
 
-Common allocation hot spots: boxing value types, LINQ over hot paths (`.Select().Where().ToList()` allocates iterators and lists), string concatenation, and closures capturing variables. Gen 2 / Large Object Heap (LOH, objects ≥85KB) collections are the expensive ones — they are not compacted by default and pause longer.
+Common allocation hot spots: boxing value types, LINQ over hot paths (`.Select().Where().ToList()` allocates iterators and lists), string concatenation, and closures capturing variables. Gen 2 collections are expensive because they scan long-lived objects; Large Object Heap (LOH, objects ≥85KB) allocations are especially costly because the LOH is not compacted by default.
 
 ```csharp
 // Allocates a new closure, iterator and list on every call — fine at low volume, deadly at 50k req/s
 var active = users.Where(u => u.IsActive).Select(u => u.Name).ToList();
 
-// Zero extra allocation on the hot path
+// Fewer allocations on the hot path: one pre-sized result list, no iterator chain
 var active = new List<string>(users.Count);
 foreach (var u in users)
     if (u.IsActive) active.Add(u.Name);
@@ -202,7 +202,7 @@ flowchart TD
 | Awaiting independent async calls sequentially | Start them together and `Task.WhenAll` |
 | Benchmarking a `Debug` build | Always benchmark `Release`, with warm-up |
 | Caching a query instead of fixing its index | Fix the query first; cache only genuinely expensive work |
-| Ignoring LOH/Gen 2 collections | They pause longer and aren't compacted by default — watch object sizes |
+| Ignoring Gen 2 and LOH pressure | Gen 2 pauses are expensive, and the LOH is not compacted by default — watch object sizes |
 
 ## Summary
 

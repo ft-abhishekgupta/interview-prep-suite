@@ -30,7 +30,7 @@ flowchart TD
 | Many **range updates**, one final read of the whole array | Difference Array | Mark only the boundaries; reconstruct with one prefix-sum pass |
 | Point updates **interleaved** with range queries | Fenwick Tree / Segment Tree | Trade array simplicity for `O(log n)` update and query |
 | Array is sorted, or two values must trade off from opposite ends | Two Pointers | Converge inward, or run same-direction slow/fast pointers |
-| "Longest/shortest substring or subarray satisfying a condition" | Sliding Window | Expand right, shrink left while the window stays valid |
+| "Longest/shortest substring or subarray satisfying a condition" | Sliding Window | Expand right, shrink left to restore or tighten the window invariant |
 | "Next greater/smaller element", "span", histogram-shaped question | Monotonic Stack | Keep indices in increasing/decreasing order; each pushed and popped once |
 | Sorted data, or a yes/no predicate that flips exactly once | Binary Search | Search on index directly, or binary search **on the answer** |
 | "Kth largest/smallest", "top K", "median of a stream" | Heap | Bounded heap of size `k`, or two heaps balanced around the median |
@@ -120,7 +120,7 @@ These three have full mechanics pages of their own — the recognition cues are:
 | Shape | Recognize it by |
 |---|---|
 | Take/leave (0/1 knapsack) | Each item used at most once, optimizing a sum under a capacity |
-| Unbounded knapsack | Same as above but items can repeat (coin change, rod cutting) |
+| Unbounded knapsack | Items can repeat under the same capacity/budget idea (coin change, rod cutting) |
 | Subset sum / partition | "Can a subset reach exactly this total" |
 | LCS / edit distance | Two sequences compared position by position |
 | Grid DP | "Number of ways" or "min/max cost" moving through a 2D grid |

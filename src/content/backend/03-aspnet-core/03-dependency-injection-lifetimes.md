@@ -37,6 +37,8 @@ services.AddScoped<AppDbContext>();
 services.AddSingleton<IMemoryCache, MemoryCache>();
 ```
 
+Entity Framework Core's `AddDbContext<TContext>()` registers the context as **scoped by default**. That matches the unit-of-work model: one request gets one change tracker and one consistent set of tracked entities, while concurrent requests get separate `DbContext` instances because `DbContext` is not thread-safe.
+
 > [!KEY]
 > Pick the lifetime based on **state and cost**, not habit. Stateless and cheap → transient. Needs to be consistent across one request → scoped. Expensive to build, thread-safe, and safe to share forever → singleton.
 
@@ -56,7 +58,7 @@ public class ReportCache // registered as singleton
 How this surfaces as a bug: `DbContext` is not thread-safe, so concurrent requests hitting the singleton's captured instance throw `InvalidOperationException: A second operation started on this context before a previous operation completed`. If the scoped service is disposable, you can also get `ObjectDisposedException` once the first request's scope disposes it — every request after that fails.
 
 > [!DANGER]
-> The built-in container **detects and throws at startup** for the most common shape of this bug (validated by default in `IsRootScope`/`ValidateScopes` in Development), but only if the mismatch is visible at registration time. Constructor injection through an intermediate abstraction, or manual `GetRequiredService` calls, can hide it until production traffic finds it.
+> The built-in container **detects and throws at resolution time, and `ValidateOnBuild` can move many failures to startup** for the most common shape of this bug (scope validation is enabled by default in Development), but only if the mismatch is visible at registration time. Constructor injection through an intermediate abstraction, or manual `GetRequiredService` calls, can hide it until production traffic finds it.
 
 ## Using IServiceScopeFactory for background work
 
@@ -129,7 +131,7 @@ public class OrderService
 }
 ```
 
-The narrow, legitimate exception is exactly the scope-creation scenario above (background services, middleware needing per-call resolution) — everywhere else, prefer explicit constructor injection.
+The narrow, legitimate exception is scope creation for background services or middleware (background services, middleware needing per-call resolution) — everywhere else, prefer explicit constructor injection.
 
 ## Testing with DI
 

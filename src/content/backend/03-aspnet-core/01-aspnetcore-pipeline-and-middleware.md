@@ -166,7 +166,7 @@ public async Task InvokeAsync(HttpContext context)
 > [!DANGER]
 > This is the same captive-dependency problem that shows up with singleton services, just wearing a middleware costume. The fix is always the same: inject `IServiceProvider`/`RequestDelegate` in the constructor, and resolve scoped services per-request via method parameters or `HttpContext.RequestServices`.
 
-`InvokeAsync` can also take extra parameters beyond `HttpContext` — the runtime resolves them from DI **per call**, which is the idiomatic way to get scoped services into convention-based middleware without the trap above.
+`InvokeAsync` can also take extra parameters beyond `HttpContext` — the runtime resolves them from DI **per call**, which is the idiomatic way to get scoped services into convention-based middleware without this lifetime trap.
 
 ## Cheat sheet
 

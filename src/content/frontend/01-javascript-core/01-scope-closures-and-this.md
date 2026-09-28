@@ -222,7 +222,7 @@ function once(fn) {
 }
 ```
 
-The returned function closes over `called` and `result`, both private to that specific closure instance — nothing outside can read or mutate `called` directly. Each call to `once(fn)` creates an independent closure, so wrapping two different functions produces two independently-tracked "has run" flags.
+The important part is that `called` and `result` live in the lexical environment created by that specific call to `once`, not on the returned function object or in global state. The wrapper checks the private flag on every invocation. On the first call it runs `fn`, caches the return value, flips the flag, and returns that value; later calls skip `fn` and return the cached result, so side effects happen at most once. Each call to `once(fn)` creates a fresh environment, so two wrapped functions do not share the same `called` flag. In production, decide explicitly whether a thrown first attempt should count as called and preserve `this` if the wrapper may be used around methods.
 
 ### Q5. What are the four rules for determining this, and which one wins if several apply?
 

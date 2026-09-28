@@ -154,6 +154,14 @@ public ListNode mergeTwoLists(ListNode a, ListNode b) {
 
 `O(n + m)` time, `O(1)` extra space (we relink existing nodes rather than allocating new ones). Merging **k** sorted lists extends this with a min-heap keyed by current node value, giving `O(N log k)` where `N` is the total number of nodes.
 
+## Pointer checklist for harder problems
+
+For problems like reverse nodes in k-group, reorder list, or partition list around a value, slow down and name the moving pieces before writing assignments. Keep a pointer to the node before the segment you are modifying, a pointer to the segment's first node, and a pointer to the node after the segment. Save the "after" pointer before reversing or splicing, because once links are rewired there may be no way to recover the rest of the list.
+
+A reliable pattern is: detach or remember boundaries, perform the local mutation, reconnect the previous part to the new segment head, reconnect the segment tail to the saved remainder, then advance the previous pointer to the segment tail. This is still `O(n)` time and `O(1)` extra space, but the explicit boundary naming prevents the classic bug where a correct local reversal loses the rest of the list.
+
+Dry-run the pointer sequence on a three-node list and on a one-node list. Linked-list code often passes the "normal" drawing but fails when the segment starts at the head, ends at the tail, or contains fewer nodes than the operation expects; those are exactly the cases dummy nodes and saved boundary pointers are meant to absorb.
+
 ## When does a linked list actually beat an array?
 
 Rarely, and it's worth saying so out loud in an interview rather than reflexively defaulting to a linked list.

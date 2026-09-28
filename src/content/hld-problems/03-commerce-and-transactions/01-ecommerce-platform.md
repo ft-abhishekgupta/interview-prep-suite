@@ -39,8 +39,8 @@ An e-commerce platform lets users browse a catalogue, hold items in a cart, and 
 | Page view QPS (peak) | 3× average | 11,600 × 3 | ~35,000/sec |
 | Search queries/day | given | given | 500M/day |
 | Search QPS (avg) | 500M / 86,400s | 500,000,000 / 86,400 | ~5,800/sec |
-| Orders/day | ~2% conversion of DAU visits | 2M/day | 2M/day |
-| Checkout QPS (avg) | 2M / 86,400s | 2,000,000,000 / 86,400,000 | ~23/sec |
+| Orders/day | ~4% conversion of 50M DAU visits | 50,000,000 × 0.04 | 2M/day |
+| Checkout QPS (avg) | 2M / 86,400s | 2,000,000 / 86,400 | ~23/sec |
 | Checkout QPS (flash sale peak) | 50× burst on hot SKUs | 23 × 50 | ~1,150/sec |
 | Catalog storage | 100M SKUs × 2KB metadata | 100,000,000 × 2KB | ~200 GB |
 | Order storage (5yr) | 2M/day × 1KB × 365 × 5 | 2M × 1KB × 1825 | ~3.65 TB |
@@ -82,7 +82,7 @@ erDiagram
 
 ## API design
 
-```
+```http
 GET /products/{sku} -> Product + availability
 GET /search?q={query}&page={n} -> Product[]
 
@@ -135,7 +135,7 @@ stateDiagram-v2
     Committed --> [*]
 ```
 
-```
+```text
 -- Atomic conditional decrement, not read-then-write
 UPDATE inventory
 SET available_qty = available_qty - 1, reserved_qty = reserved_qty + 1

@@ -68,11 +68,11 @@ erDiagram
     NODE ||--o{ CACHEENTRY : replicates
 ```
 
-`CacheEntry` is not a durable row in a traditional sense — it lives entirely in a node's memory, indexed by a hash map for O(1) lookup and linked into a doubly linked list for O(1) LRU maintenance (detailed below). `RingSegment` and `ClusterState` are the metadata that make routing and rebalancing possible.
+`CacheEntry` is not a durable row in a traditional sense — it lives entirely in a node's memory, indexed by a hash map for O(1) lookup and linked into a doubly linked list for O(1) LRU maintenance. `RingSegment` and `ClusterState` are the metadata that make routing and rebalancing possible.
 
 ## API design
 
-```
+```http
 GET    /key/{k}          -> { value, ttlRemaining } | 404
 PUT    /key/{k}          Body: { value, ttlSeconds }  -> 200 OK
 DELETE /key/{k}          -> 200 OK
@@ -208,7 +208,7 @@ public void put(K key, V value) {
 
 - **Hot keys** bypass sharding entirely since one key always maps to the same node(s) — solved via explicit hot-key replication/local caching, not by adding more nodes.
 - **Rebalancing storms**: adding several nodes at once can trigger a large simultaneous data migration; stagger node additions and rate-limit migration traffic to avoid saturating network bandwidth.
-- **Memory fragmentation**: long-running cache nodes with many small, varyingly-sized entries can suffer from allocator fragmentation; slab allocation (grouping similarly-sized allocations into fixed-size classes, as Redis's `jemalloc`-based allocator and Memcached's slab allocator both do) reduces fragmentation at a small cost in wasted space per slab class.
+- **Memory fragmentation**: long-running cache nodes with many small, varyingly-sized entries can suffer from allocator fragmentation; size-class allocation reduces this by grouping similarly-sized allocations together. Memcached exposes this as slab classes, while Redis relies on `jemalloc` size classes — similar motivation, different implementation details.
 - **Gossip overhead at very large cluster sizes**: at hundreds to low thousands of nodes, gossip fan-out and convergence time need tuning (e.g., adjusting gossip interval and fan-out count) to avoid stale membership views lingering too long.
 
 ## Failure scenarios

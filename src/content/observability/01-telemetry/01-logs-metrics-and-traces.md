@@ -21,7 +21,7 @@ A system is "observable" when its internal state can be inferred from its extern
 | | Logs | Metrics | Traces |
 |---|---|---|---|
 | What it answers | What exactly happened, with full context | Is the system healthy, in aggregate, over time | Where did this one request spend its time |
-| Cardinality | High — free text, any field | Must be kept low (see below) | High per span, but scoped to one trace |
+| Cardinality | High — free text, any field | Must be kept low to avoid time-series explosion | High per span, but scoped to one trace |
 | Cost driver | Storage volume, ingest bytes | Number of unique time series | Storage volume, sampling rate |
 | Retention | Days to weeks (expensive to keep long) | Months (cheap once aggregated) | Days (huge volume, sampled) |
 | Query shape | Full-text / field search over a window | Aggregation over time (rate, avg, percentile) | Single request timeline, span tree |
@@ -73,7 +73,7 @@ The second form, using message templates (a core feature of `Microsoft.Extension
 
 Cardinality is the number of unique time series a metric name produces once you count every label combination. A metric with `user_id` or `order_id` as a label is not a metric anymore — it is an unbounded set of metrics, and it will fall over your metrics backend or your bill.
 
-```
+```text
 http_requests_total{method="GET", route="/orders/:id", status="200"}   # fine — bounded
 http_requests_total{method="GET", route="/orders/{orderId}", status="200"}  # explosion
 ```
@@ -86,7 +86,7 @@ http_requests_total{method="GET", route="/orders/{orderId}", status="200"}  # ex
 Full-fidelity data at scale is unaffordable, so all three pillars sample or aggregate:
 
 - **Logs** — sample verbose levels (`Debug`) in production, or sample a percentage of successful requests while always keeping errors.
-- **Traces** — head-based (decide at the start, cheap, may miss rare slow traces) or tail-based (decide after seeing the full trace, catches the interesting ones, costs more to buffer). Covered in depth in the tracing page.
+- **Traces** — head-based (decide at the start, cheap, may miss rare slow traces) or tail-based (decide after seeing the full trace, catches the interesting ones, costs more to buffer).
 - **Metrics** — pre-aggregated at collection time (histograms, not raw events), so "sampling" here really means bucket/resolution choice.
 
 ## Events and profiles — the fourth and fifth signal

@@ -127,9 +127,20 @@ for (int n = 0; n < 1000; n++)
 | `LinkedList<T>` | Doubly linked nodes | `O(n)` | `O(1)` given a node | `O(n)` | Insertion order | Frequent insert/remove at both ends or mid-list given a node reference |
 | `ConcurrentDictionary<K,V>` | Striped/lock-free hash table | — | `O(1)` avg | `O(1)` avg | No guaranteed order | Thread-safe shared cache/map |
 | `ImmutableList<T>` | Balanced binary tree (AVL-like) | `O(log n)` | `O(log n)`, returns new instance | `O(n)` | Insertion order | Safe sharing across threads without locks, undo/redo, functional style |
+| `FrozenDictionary<K,V>` | Hash table optimised at build time | — | Not supported after construction | `O(1)`, faster constant than `Dictionary` | No guaranteed order | Build-once, read-many lookup tables |
+| `FrozenSet<T>` | Set optimised at build time | — | Not supported after construction | `O(1)`, faster constant than `HashSet` | No guaranteed order | Build-once, read-many membership checks |
 
 > [!WARNING]
 > `ImmutableList<T>.Add` is `O(log n)`, not `O(1)` like `List<T>.Add` — it must build a new tree path to preserve the old version. If you need frequent mutation and don't need immutability guarantees, `List<T>` is the right default; reach for `ImmutableList<T>` specifically for safe cross-thread sharing or when you need to keep prior versions around (undo, snapshotting).
+
+> [!TIP]
+> `FrozenDictionary` and `FrozenSet` (.NET 8) pay a noticeably higher construction cost to analyse the keys and pick a specialised lookup strategy, in exchange for faster reads than `Dictionary`/`HashSet` for the rest of the process lifetime. They are the right answer for configuration maps, routing tables and permission sets built once at startup — and the wrong answer for anything you mutate. Naming them when asked "how would you speed up a hot lookup" is a cheap senior signal.
+
+```csharp
+// Built once at startup, read on every request.
+private static readonly FrozenDictionary<string, Handler> Routes =
+    BuildRoutes().ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+```
 
 ## Choosing the right collection
 

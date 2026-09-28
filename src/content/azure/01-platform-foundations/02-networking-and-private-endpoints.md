@@ -106,7 +106,7 @@ Peering is not transitive: if Spoke A peers with Hub, and Hub peers with Spoke B
 By default, resources in a VNet can reach the internet directly. **Forced tunnelling** overrides this with a user-defined route (UDR) sending `0.0.0.0/0` through a central firewall or NVA, so all egress is inspectable and FQDN-filterable — required in regulated environments. For PaaS services (Storage, SQL, Cosmos DB, Key Vault, Service Bus...), network isolation is a three-step pattern: disable public network access, add a private endpoint into a dedicated subnet, and link the matching private DNS zone.
 
 > [!WARNING]
-> Forced tunnelling breaks anything that relies on Azure's default outbound path (including some managed identity token requests to Azure AD endpoints and Instance Metadata Service calls) if the firewall doesn't explicitly allow those FQDNs. Always allow-list the required Azure AD, ARM, and platform endpoints before enabling forced tunnelling broadly.
+> Forced tunnelling breaks anything that relies on Azure's default outbound path (including some managed identity token requests to Microsoft Entra ID endpoints and Instance Metadata Service calls) if the firewall doesn't explicitly allow those FQDNs. Always allow-list the required Microsoft Entra ID, ARM, and platform endpoints before enabling forced tunnelling broadly.
 
 ## Cheat sheet
 
@@ -154,7 +154,7 @@ NSGs are stateful L3/L4 allow/deny rules scoped to a subnet or NIC — good for 
 
 ### Q5. What's the risk of enabling forced tunnelling without additional configuration, and how would you roll it out safely?
 
-Forced tunnelling redirects all outbound traffic — including `0.0.0.0/0` — through a central firewall or NVA via a user-defined route, which is necessary for full egress inspection but breaks anything relying on Azure's default outbound internet path unless explicitly allowed through the firewall. This commonly breaks managed identity token acquisition (calls to Azure AD endpoints), Windows/Linux update services, and any SaaS dependency the app calls directly. I'd roll it out by first cataloguing every FQDN/IP the workload legitimately needs (Azure AD, ARM, package repositories, third-party APIs), explicitly allow-listing them on the firewall, testing in a non-production spoke first, and monitoring firewall deny logs closely after cutover to catch anything missed before it becomes an incident.
+Forced tunnelling redirects all outbound traffic — including `0.0.0.0/0` — through a central firewall or NVA via a user-defined route, which is necessary for full egress inspection but breaks anything relying on Azure's default outbound internet path unless explicitly allowed through the firewall. This commonly breaks managed identity token acquisition (calls to Microsoft Entra ID endpoints), Windows/Linux update services, and any SaaS dependency the app calls directly. I'd roll it out by first cataloguing every FQDN/IP the workload legitimately needs (Microsoft Entra ID, ARM, package repositories, third-party APIs), explicitly allow-listing them on the firewall, testing in a non-production spoke first, and monitoring firewall deny logs closely after cutover to catch anything missed before it becomes an incident.
 
 ### Q6. How do you plan CIDR ranges across an organisation with many teams deploying their own VNets?
 

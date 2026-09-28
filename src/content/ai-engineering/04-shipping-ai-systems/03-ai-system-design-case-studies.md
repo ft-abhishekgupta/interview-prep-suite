@@ -209,7 +209,7 @@ The dominant failure mode is a plausible-looking suggestion referencing a functi
 - Deterministic checks (schema validation, compile, lint, policy caps) catch what generation-quality metrics alone will miss.
 - Evaluate agentic systems on trajectory/decision correctness (right tool, right escalation) not exact output text.
 - Cost at scale is almost always dominated by the highest-cost tier (human review, largest model, whole-repo context) — the design's job is to keep that tier's volume small.
-- Every case study above reduces to the same shape: cheap/fast path for the common case, escalation to a more expensive or human path for the hard tail, deterministic guardrails around anything irreversible.
+- These case study designs reduce to the same shape: cheap/fast path for the common case, escalation to a more expensive or human path for the hard tail, deterministic guardrails around anything irreversible.
 
 ## Common mistakes
 

@@ -20,7 +20,7 @@ Cross-Site Scripting means an attacker gets **their JavaScript to execute in ano
 ```typescript
 // Vulnerable: raw HTML injection from user input
 function Comment({ text }: { text: string }) {
-  return <div dangerouslySetInnerHTML={{ __html: text }} />; // executes any script tag in `text`
+  return <div dangerouslySetInnerHTML={{ __html: text }} />; // parses attacker-controlled markup as HTML
 }
 
 // Safe: React escapes text content by default
@@ -147,7 +147,7 @@ Stored XSS happens when malicious script is saved on the server (in a database, 
 
 ### Q2. Why is dangerouslySetInnerHTML dangerous, and how would you safely render user-generated rich text?
 
-React escapes all text content by default when you render `{value}` inside JSX, converting any HTML-significant characters so they display as text rather than being parsed as markup — this is what prevents most XSS by default. `dangerouslySetInnerHTML` explicitly opts out of that protection and tells React to parse the given string as raw HTML and insert it into the DOM, so if that string contains `<script>` tags or event handler attributes like `onerror=`, the browser will execute them. To safely render genuinely-needed rich text (a blog post editor, formatted comments), the content must be sanitised through a maintained library like DOMPurify that strips dangerous tags/attributes/URL schemes, ideally both on the way in (server-side, before storage) and on the way out (client-side, before rendering) as defence in depth — never trust a single sanitisation pass, and never write a custom regex-based sanitiser, since HTML/JS injection has many non-obvious bypasses.
+React escapes all text content by default when you render `{value}` inside JSX, converting any HTML-significant characters so they display as text rather than being parsed as markup — this is what prevents most XSS by default. `dangerouslySetInnerHTML` explicitly opts out of that protection and tells React to parse the given string as raw HTML and insert it into the DOM. Script tags inserted this way are not reliably executed by browsers, but that is not a defence: event handler attributes, dangerous URL schemes, unsafe SVG/HTML and sanitizer bypasses can still run attacker-controlled code. To safely render genuinely-needed rich text (a blog post editor, formatted comments), the content must be sanitised through a maintained library like DOMPurify that strips dangerous tags/attributes/URL schemes, ideally both on the way in (server-side, before storage) and on the way out (client-side, before rendering) as defence in depth — never trust a single sanitisation pass, and never write a custom regex-based sanitiser, since HTML/JS injection has many non-obvious bypasses.
 
 ### Q3. Explain what CORS actually protects against, and what a common misconception about it is.
 

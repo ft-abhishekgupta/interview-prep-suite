@@ -5,7 +5,7 @@ difficulty: Advanced
 tags: [observability, debugging, incident-management, performance, production]
 ---
 
-"Production latency just spiked — what do you do?" is close to guaranteed in a senior interview because it tests everything at once: systems knowledge, structured thinking under pressure, and whether you reach for evidence instead of guesses. This page is the playbook — the first questions, the change-first heuristic, a layer-by-layer narrowing process, and a symptom-to-cause map covering the eleven most common culprits.
+"Production latency just spiked — what do you do?" is close to guaranteed in a senior interview because it tests everything at once: systems knowledge, structured thinking under pressure, and whether you reach for evidence instead of guesses. This page is the playbook — the first questions, the change-first heuristic, a layer-by-layer narrowing process, and a symptom-to-cause map covering the twelve most common culprits.
 
 ## First questions
 
@@ -55,7 +55,7 @@ flowchart LR
     D --> E["Downstream dependencies<br/>third-party APIs"]
 ```
 
-At each layer, check that layer's own saturation and error signals before moving to the next — this is the RED/USE thinking from the dashboards page applied live during an incident.
+At each layer, check that layer's own saturation and error signals before moving to the next — this is RED/USE thinking applied live during an incident.
 
 ## Symptom to cause
 
@@ -124,7 +124,7 @@ This is the map to have memorised — for each, the confirming signal and the mi
 
 ## Summary
 
-A structured response to a latency spike starts with fast, cheap questions — when exactly, what changed, how wide is the impact — because most incidents correlate with a recent, revertible change. When nothing recent correlates, narrow layer by layer from the edge to downstream dependencies, using the specific confirming signal for each candidate cause rather than the first plausible story. The eleven-cause map (slow dependency, contention, pool exhaustion, thread starvation, GC pressure, cache miss storm, hot partition, noisy neighbour, retry storm, DNS, TLS, disk I/O) gives you a checklist to reason through live, and the worked walkthrough shows the right order of operations: mitigate first, understand the mechanism after.
+A structured response to a latency spike starts with fast, cheap questions — when exactly, what changed, how wide is the impact — because most incidents correlate with a recent, revertible change. When nothing recent correlates, narrow layer by layer from the edge to downstream dependencies, using the specific confirming signal for each candidate cause rather than the first plausible story. The twelve-cause map (slow dependency, contention, pool exhaustion, thread starvation, GC pressure, cache miss storm, hot partition, noisy neighbour, retry storm, DNS, TLS, disk I/O) gives you a checklist to reason through live, and the worked walkthrough shows the right order of operations: mitigate first, understand the mechanism after.
 
 ## Top Interview Questions
 

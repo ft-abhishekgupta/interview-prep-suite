@@ -212,7 +212,7 @@ Mocking `HttpMessageHandler` (via Moq's `Protected()` extension) is the standard
 - **Value objects / DTOs with no behaviour** — just construct a real instance.
 - **The class under test itself** — you'd be testing the mock, not the code.
 - **Simple pure functions or math** — call the real thing, it's deterministic and fast.
-- **Types you don't own, directly** — wrap them first (see above).
+- **Types you don't own, directly** — wrap them behind your own interface first.
 - **Everything, "to be safe"** — if every collaborator is mocked, the test only proves the mocks were configured correctly.
 
 ## Decision table: which double do I need?

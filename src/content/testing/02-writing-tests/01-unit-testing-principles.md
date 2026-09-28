@@ -95,8 +95,7 @@ A good test name should let someone read a failure report and know what broke **
 | `ApplyDiscountTest` | `ApplyDiscount_ReturnsOriginalTotal_WhenBelowThreshold` |
 | `TestNullUser` | `Register_ThrowsArgumentNullException_WhenEmailIsNull` |
 
-> [!TIP]
-> Read the test name out loud as a sentence. If it reads like a spec ("withdraw throws insufficient funds when amount exceeds balance"), you've named it well. If it reads like an implementation note, rename it.
+Read the test name out loud as a sentence. If it reads like a spec ("withdraw throws insufficient funds when amount exceeds balance"), you've named it well. If it reads like an implementation note, rename it.
 
 ## Independence and shared state
 
@@ -116,7 +115,7 @@ public class OrderServiceTests
 }
 ```
 
-xUnit creates a **new instance of the test class per test**, so instance fields are safe by default — the bug above only bites with `static` fields or genuinely shared external resources (a database, a file, a singleton). Use `IClassFixture<T>` for expensive shared setup and reset mutable state in constructor/`Dispose`, not by hoping test order stays stable.
+xUnit creates a **new instance of the test class per test**, so instance fields are safe by default — shared-state bugs usually come from `static` fields or genuinely shared external resources (a database, a file, a singleton). Use `IClassFixture<T>` for expensive shared setup and reset mutable state in constructor/`Dispose`, not by hoping test order stays stable.
 
 > [!DANGER]
 > A test suite that only passes when run in a specific order (or only in isolation, never in parallel) is already broken — it's hiding a shared-state bug that will eventually cause a flaky CI run.
@@ -264,6 +263,44 @@ public void ShoppingCart_ContainsItem_AfterAdding()
 
 A strong signal you've drifted into implementation testing: you had to add a method or property *only* so the test could see it, or the test breaks when you rename a private field but the feature still works correctly.
 
+## Test-driven development
+
+Test-driven development (TDD) is a design technique, not a moral test of whether someone is a "real" engineer. The red-green-refactor cycle is: write a failing test for the next small behaviour, write the minimum production code to pass it, then improve the design while the tests stay green.
+
+The **red** step is not optional. It proves the test can fail for the reason you think it can fail. If you write a test after the code already works and it passes immediately, you have not proven that the assertion is meaningful; it might be asserting the wrong thing, not running the code path, or accepting a default value by accident.
+
+```csharp
+[Fact]
+public void Apply_ReturnsZeroDiscount_WhenTotalIsBelowThreshold()
+{
+    var calculator = new DiscountCalculator(threshold: 100m, rate: 0.10m);
+
+    var discount = calculator.Apply(total: 80m);
+
+    Assert.Equal(0m, discount); // red first: implementation currently returns 8m
+}
+
+public sealed class DiscountCalculator
+{
+    public DiscountCalculator(decimal threshold, decimal rate) { /* store values */ }
+    public decimal Apply(decimal total) => total < _threshold ? 0m : total * _rate;
+}
+```
+
+TDD buys three practical things. First, it pressures the design toward seams: if a behaviour is painful to test, the production API is probably painful to use. Second, it creates a suite with a stronger trust history because every new test was observed failing at least once. Third, it encourages small safe steps, which is valuable when changing code with branching rules or fragile edge cases. It does not fit every task. Exploratory spikes, UI layout work, generated framework glue, and code whose shape is dictated by a framework often benefit more from quick exploration followed by tests once the shape is known.
+
+> [!TIP]
+> The honest interview answer is rarely "yes, always" or "no, never." A strong answer is: "I use TDD when it clarifies design, especially for domain rules and state machines; I do not force it onto exploratory UI or framework glue."
+
+TDD also exposes two schools of unit-testing style:
+
+| School | Also called | What it mocks | What it asserts | Good at | Failure mode |
+|---|---|---|---|---|---|
+| Chicago | Classicist, inside-out | Only true boundaries such as network, clock, database or email | Final state and observable outputs | Refactor-safe tests and realistic collaboration inside the unit | Can leave design pressure too weak until later integration tests |
+| London | Mockist, outside-in | Every collaborator of the class under test | Interactions, messages and call expectations | Driving API design from the outside and isolating behaviour very tightly | Brittle suites that break when internal collaboration changes |
+
+The practical position for most strong teams is in the middle. Use the Chicago / classicist style when state is observable and collaborators are cheap to run; it makes refactors safer. Use the London / mockist style when the interaction itself is the behaviour or when designing from a top-level use case helps discover interfaces. The choice matters because behaviour-verification-heavy tests tend to pin down call sequences, while state-verification-heavy tests tend to survive implementation changes but may catch design problems later.
+
 ## Cheat sheet
 
 - A unit is a behaviour reachable through a public contract, not a mechanical one-class-one-test rule.
@@ -275,6 +312,8 @@ A strong signal you've drifted into implementation testing: you had to add a met
 - `Assert.Throws`/`ThrowsAsync` for exceptions; `async Task` + `await` for async tests, never `.Result`/`.Wait()`.
 - FIRST: Fast, Independent, Repeatable, Self-validating, Timely.
 - If a test needs a method that exists only for the test to call, you're testing implementation, not behaviour.
+- TDD's red step proves the test can fail; green proves the smallest behaviour works; refactor improves design safely.
+- Chicago / classicist tests prefer real collaborators and state assertions; London / mockist tests prefer mocked collaborators and interaction assertions.
 
 ## Common mistakes
 
@@ -287,10 +326,12 @@ A strong signal you've drifted into implementation testing: you had to add a met
 | Exposing internals with a `ForTesting` method | Assert on observable outputs/behaviour instead |
 | One giant test asserting five unrelated behaviours | Split into focused tests, one reason to fail each |
 | Copy-pasted near-identical tests for each input | Use `[Theory]` with `InlineData`/`MemberData` |
+| Skipping TDD's red step because the implementation already exists | Temporarily break or withhold the implementation so you know the test fails for the right reason |
+| Mocking every collaborator by habit | Choose Chicago or London style deliberately based on whether state or interaction is the real behaviour |
 
 ## Summary
 
-Good unit tests describe behaviour through a public contract, follow Arrange-Act-Assert, fail for exactly one reason, and read like a specification when they fail. Determinism is non-negotiable — time, randomness, culture and I/O must be injected so the same test gives the same answer everywhere. FIRST is the checklist to run a suite against when it starts feeling slow or flaky. The single biggest tell of a maturing test suite is that refactors internal to a class don't break its tests — only changes to its actual behaviour do.
+Good unit tests describe behaviour through a public contract, follow Arrange-Act-Assert, fail for exactly one reason, and read like a specification when they fail. Determinism is non-negotiable — time, randomness, culture and I/O must be injected so the same test gives the same answer everywhere. TDD adds design pressure through red-green-refactor, but it is a selective technique rather than a universal workflow. The single biggest tell of a maturing test suite is that refactors internal to a class don't break its tests — only changes to its actual behaviour do.
 
 ## Top Interview Questions
 
@@ -334,10 +375,10 @@ Fast, Independent, Repeatable, Self-validating, Timely. Fast is listed first bec
 
 A common real example: a test class holds a `static readonly List<T>` used as an in-memory "repository" fake, and one test adds an item to it while another test asserts the list is empty — the outcome then depends entirely on execution order, which is invisible until CI parallelises test execution or reorders tests and the suite starts failing intermittently. The fix is to never use `static` mutable fields for per-test state; xUnit already creates a fresh instance of the test class per test, so instance fields are naturally isolated. For genuinely expensive shared setup (e.g., a Testcontainers database), use `IClassFixture<T>`/`ICollectionFixture<T>` but explicitly reset mutable state between tests rather than relying on order.
 
-### Q11. How do you decide whether a piece of logic deserves its own unit test versus being covered incidentally by a higher-level test?
+### Q11. What is red-green-refactor, and why is the red step important?
 
-Ask whether the logic has a distinct failure mode that needs a precise, fast-to-debug signal — branching conditions, boundary values, error handling, calculations. If yes, it deserves a direct unit test with the specific input/output pinned down, because a failure at the integration or e2e level would only tell you "something is wrong" with a much slower feedback loop. If the logic is trivial (a pass-through property, a one-line delegation with no branching) it's reasonable to let it be covered incidentally, since a dedicated test would just restate the implementation with no real risk being mitigated.
+Red-green-refactor is the TDD loop: first write a test for the next small behaviour and see it fail, then write the minimum production code that makes it pass, then refactor the implementation while the test stays green. The red step matters because it proves the test is capable of detecting the missing or broken behaviour. Without it, a passing test might be exercising the wrong path, asserting a weak condition, or passing because the setup accidentally matches a default. In interviews, frame TDD as design pressure and feedback discipline, not as ceremony. It works best for domain rules, state machines and edge cases where small safe steps help; it is less useful for throwaway spikes or framework-driven glue.
 
-### Q12. A colleague argues you should test private methods directly to get full coverage. How do you respond?
+### Q12. Compare Chicago and London schools of TDD.
 
-Testing private methods directly means changing their access modifier or using reflection to reach them, both of which couple the test suite to implementation details a caller never sees. Private methods exist to serve the public behaviour — if a private method's logic is important enough to warrant its own focused test, that's usually a signal it should be extracted into its own class with a public API, not that the current class's private method should be exposed. Instead, test the private method's effects through the public methods that call it, covering enough input combinations to exercise the branches inside — this keeps the test suite refactor-safe, since you're free to change the private implementation as long as the public behaviour is unchanged.
+Chicago, also called classicist or inside-out TDD, prefers real collaborators inside the unit and mocks only true boundaries such as network, time, email or databases. It asserts on final state and observable outputs, so tests tend to survive refactors well. London, also called mockist or outside-in TDD, mocks each collaborator and asserts interactions, letting design emerge from top-level behavior and expected messages between objects. It can produce clean interfaces quickly, but it can also create brittle tests that fail when internal call sequences change even though user-visible behavior is unchanged. Most strong teams blend them: state verification by default, interaction verification when the interaction itself is the requirement.

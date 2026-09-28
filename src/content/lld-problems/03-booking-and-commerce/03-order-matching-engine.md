@@ -100,7 +100,7 @@ classDiagram
 
 `OrderBook` uses a `TreeMap<BigDecimal, Deque<Order>>` for each side — the map gives O(log n) access to the best price level, and the FIFO queue inside each level gives O(1) access to the earliest order at that price. Because `TreeMap` orders and de-duplicates keys with `compareTo` (never `equals`), price levels merge correctly — `150.50` and `150.5` resolve to the same level, which a `HashMap` keyed on `BigDecimal` (whose `equals` is scale-sensitive) would wrongly split into two. The rejected alternative — one flat sorted list of all orders — would need O(n) or O(log n + k) work just to find "all orders at the best price, in arrival order", conflating two different priorities (price, then time) into one structure.
 
-```
+```text
               ASKS                              BIDS
    price      queue (FIFO)             price      queue (FIFO)
    151.00  -> [o7, o9]                 150.00  -> [o2, o5]     <- best bid

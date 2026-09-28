@@ -167,7 +167,7 @@ spec:
             command: ["sh", "-c", "sleep 5"]
 ```
 
-When a Pod is deleted, Kubernetes: removes it from Service Endpoints (stopping new traffic) **in parallel with** sending `SIGTERM` and running `preStop` — these are not strictly sequential, which is exactly why a short `preStop sleep` is a common pattern to bridge the gap while endpoint removal propagates across the cluster. After `terminationGracePeriodSeconds` (default 30s) the kubelet sends `SIGKILL` if the process hasn't exited.
+When a Pod is deleted, endpoint removal begins as soon as the Pod gets a deletion timestamp, while the kubelet runs any `preStop` hook and then sends `SIGTERM` to the container. Those control-plane and node-local actions are not a single strictly ordered traffic-drain sequence, which is why a short `preStop` sleep is a common pattern to bridge the gap while endpoint removal propagates across the cluster. After `terminationGracePeriodSeconds` (default 30s) the kubelet sends `SIGKILL` if the process hasn't exited.
 
 > [!WARNING]
 > Because Endpoint removal and SIGTERM delivery race each other, a Pod can receive a request *after* SIGTERM but *before* it's fully removed from every node's kube-proxy rules. A `preStop` hook with a short sleep (long enough to cover Endpoint propagation, often a few seconds) is the standard mitigation, alongside the application handling in-flight requests gracefully on SIGTERM rather than dying immediately.

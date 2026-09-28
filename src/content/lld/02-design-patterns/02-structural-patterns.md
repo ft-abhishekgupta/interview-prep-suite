@@ -21,7 +21,7 @@ classDiagram
         +pay(BigDecimal)
     }
     class RazorPayApi {
-        +makePayment(double)
+        +makePayment(long amountInPaise)
     }
     Payment <|.. RazorPayAdapter
     RazorPayAdapter --> RazorPayApi
@@ -32,12 +32,15 @@ interface Payment {
     void pay(BigDecimal amount);
 }
 class RazorPayApi { // third-party, cannot change its signature
-    public void makePayment(double amount) { System.out.println("Paid " + amount); }
+    public void makePayment(long amountInPaise) { System.out.println("Paid " + amountInPaise); }
 }
 class RazorPayAdapter implements Payment {
     private final RazorPayApi api;
     public RazorPayAdapter(RazorPayApi api) { this.api = api; }
-    public void pay(BigDecimal amount) { api.makePayment(amount.doubleValue()); } // translates the call
+    public void pay(BigDecimal amount) {
+        long paise = amount.movePointRight(2).longValueExact();
+        api.makePayment(paise); // translates rupees to the provider's minor-unit API
+    }
 }
 ```
 

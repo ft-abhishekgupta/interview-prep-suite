@@ -100,7 +100,7 @@ When a cache is full, something has to go. The policy you pick changes what "hot
 | FIFO | The oldest inserted item, regardless of access | Simple, predictable; streaming/log-like data | Ignores access pattern entirely — can evict hot data |
 | Random | A random item | Very cheap to implement, surprisingly competitive at scale | No guarantees; unpredictable in a demo or a debugging session |
 
-**Worth knowing: Redis defaults to an approximated LRU** (sampling a small set of keys rather than tracking true global recency) because exact LRU has memory and CPU overhead that isn't worth it at scale.
+**Worth knowing: Redis does not evict by default** (`noeviction`); once you choose an LRU eviction policy such as `allkeys-lru` or `volatile-lru`, Redis implements it approximately by sampling a small set of keys rather than tracking true global recency. Exact LRU has memory and CPU overhead that is not worth it at scale.
 
 ![alt text](notes/05-HighLevelDesign/Caching/image-16.png)
 
@@ -142,7 +142,7 @@ Hit ratio = cache hits / (cache hits + cache misses)
 
 ## CDNs: pull vs push
 
-A CDN is a geographically distributed network of edge servers that cache content close to users instead of serving every request from a single origin — it is the CDN/edge row from the layer table above, worth its own section because the interview question "how does content get onto the edge" has a specific two-answer shape.
+A CDN is a geographically distributed network of edge servers that cache content close to users instead of serving every request from a single origin — it is the edge-cache layer, and it is worth naming because the interview question "how does content get onto the edge" has a specific two-answer shape.
 
 | CDN model | How it populates the edge | Best for |
 |---|---|---|
@@ -206,9 +206,9 @@ Write-through synchronously writes to both the cache and the database before ack
 
 With a normal TTL, a key simply expires and the next request after expiry experiences a cache miss, paying the full cost of reloading from the source. Refresh-ahead instead proactively reloads a key in the background shortly before its TTL would expire, so a request for that key never actually experiences a miss in the foreground request path. This only makes sense for keys you can identify as reliably hot in advance — applying it to every key would mean constantly refreshing data nobody is currently requesting, wasting load on the source system for no benefit.
 
-### Q4. How does Redis implement LRU eviction, and why doesn't it track exact recency for every key?
+### Q4. How does Redis implement LRU eviction when configured for it, and why doesn't it track exact recency for every key?
 
-Redis uses an approximated LRU by default: rather than maintaining a perfectly ordered list of every key by last-access time (which would require metadata updates on every single read, adding overhead to the hottest path in the system), it samples a small random set of keys, checks their recency metadata, and evicts the least recently used among that sample. This gives a result close to true LRU with far less overhead, and the sample size is tunable — a larger sample gets closer to exact LRU at the cost of more CPU per eviction decision. It's a good example of trading a small amount of accuracy for a much better operational cost profile.
+Redis's default policy is `noeviction`, so it returns errors when the memory limit is hit rather than evicting keys. If you configure an LRU policy (`allkeys-lru` or `volatile-lru`), Redis uses an approximated LRU: rather than maintaining a perfectly ordered list of every key by last-access time (which would require metadata updates on every read), it samples a small random set of keys, checks their recency metadata, and evicts the least recently used among that sample. This gives a result close to true LRU with far less overhead, and the sample size is tunable.
 
 ### Q5. A cache has a 60% hit ratio and the team wants to just add more memory. What would you check first?
 

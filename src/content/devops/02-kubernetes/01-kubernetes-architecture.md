@@ -45,7 +45,7 @@ flowchart TB
 
 Kubernetes is built around a single repeating pattern: **desired state** (what you declared in YAML) vs **observed state** (what's actually running), continuously reconciled by controllers.
 
-```
+```text
 loop forever:
     desired  := read spec from etcd (via API server)
     observed := read current status (via API server)

@@ -160,6 +160,7 @@ public class IdempotencyMiddleware
 ```
 
 The `TryGetAsync` call must atomically insert a "processing" placeholder row (relying on the unique constraint on `idempotency_key`) so a concurrent duplicate fails fast with 409 instead of racing through to the handler.
+`HashBodyAsync` must enable request buffering and rewind `context.Request.Body` before `_next(context)` runs; otherwise the middleware would consume the body and leave the real endpoint with an empty stream.
 
 ## Cheat sheet
 

@@ -76,9 +76,10 @@ Because publishing is at-least-once, a consumer will eventually see the same mes
 
 ```sql
 CREATE TABLE inbox (
-    message_id   UUID PRIMARY KEY,   -- the id from the event envelope
+    message_id   UUID NOT NULL,      -- the id from the event envelope
     consumer     VARCHAR(100) NOT NULL,
-    processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (message_id, consumer)
 );
 ```
 

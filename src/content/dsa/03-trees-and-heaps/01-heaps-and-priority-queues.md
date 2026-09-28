@@ -184,12 +184,12 @@ public class MedianFinder {
     }
 
     public double findMedian() {
-        return lo.size() > hi.size() ? lo.peek() : (lo.peek() + hi.peek()) / 2.0;
+        return lo.size() > hi.size() ? lo.peek() : ((long) lo.peek() + hi.peek()) / 2.0;
     }
 }
 ```
 
-Each insert is `O(log n)`; `FindMedian` is `O(1)` — a huge improvement over re-sorting on every insert.
+Each insert is `O(log n)`; `findMedian` is `O(1)` — a huge improvement over re-sorting on every insert.
 
 ## Heap vs sorted list vs BST
 
@@ -248,7 +248,7 @@ Three approaches, in increasing order of efficiency: (1) sort the array and inde
 
 ### Q4. Design a data structure that returns the median of a growing stream of numbers efficiently.
 
-Maintain two heaps: a max-heap holding the smaller half of the numbers seen so far, and a min-heap holding the larger half, keeping their sizes equal or differing by at most one. On each insertion, add the new number to one heap and then rebalance by moving the extreme element across if the size invariant is violated — this keeps both heaps balanced in `O(log n)` per insertion. The median is then `O(1)` to retrieve: if the heaps are equal in size, it's the average of both roots; if one has one more element, it's that heap's root. This beats re-sorting the whole dataset on every insertion (`O(n log n)` per number) by a huge margin.
+Maintain two heaps: a max-heap holding the smaller half of the numbers seen so far, and a min-heap holding the larger half, keeping their sizes equal or differing by at most one. On each insertion, add the new number to one heap and then rebalance by moving the extreme element across if the size invariant is violated — this keeps both heaps balanced in `O(log n)` per insertion. The median is then `O(1)` to retrieve: if the heaps are equal in size, it's the average of both roots (cast before adding to avoid integer overflow); if one has one more element, it's that heap's root. This beats re-sorting the whole dataset on every insertion (`O(n log n)` per number) by a huge margin.
 
 ### Q5. Explain how a priority queue is used in Dijkstra's shortest path algorithm.
 
@@ -276,4 +276,4 @@ Choose a heap when you mostly need to repeatedly insert and extract the current 
 
 ### Q11. How do you delete an arbitrary, known element from a heap — not just the root?
 
-Locate the element's index (an auxiliary hash map from value to index turns this into `O(1)` instead of an `O(n)` scan), overwrite that slot with the last element in the underlying array, shrink the array by one, and then restore the heap property from that index — sift it down if it's now larger than one of its new children (min-heap), or sift it up if it's now smaller than its new parent. Only one direction will actually move the element, so it's safe to attempt both. This is `O(log n)` once the index is known, and it's the operation behind features like cancelling a specific scheduled job or evicting a specific stale entry, as opposed to `Dequeue`, which only ever removes the current extreme.
+Locate the element's index (an auxiliary hash map from value to index turns this into `O(1)` instead of an `O(n)` scan), overwrite that slot with the last element in the underlying array, shrink the array by one, and then restore the heap property from that index — sift it down if it's now larger than one of its new children (min-heap), or sift it up if it's now smaller than its new parent. Only one direction will actually move the element, so it's safe to attempt both. This is `O(log n)` once the index is known, and it's the operation behind features like cancelling a specific scheduled job or evicting a specific stale entry, as opposed to `poll`, which only ever removes the current extreme.

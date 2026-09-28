@@ -11,7 +11,7 @@ A JSON Web Token (JWT) is a compact, signed, self-contained way to carry claims 
 
 A JWT is three base64url-encoded segments joined by dots: `header.payload.signature`.
 
-```
+```text
 eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYzEyMyJ9
 .
 eyJzdWIiOiJ1c2VyXzQyIiwiaXNzIjoiaHR0cHM6Ly9hdXRoLmV4YW1wbGUuY29tIiwiYXVkIjoiaW52ZW50b3J5LWFwaSIsImV4cCI6MTczMDAwMDAwMCwiaWF0IjoxNzI5OTk2NDAwLCJyb2xlIjoiYWRtaW4ifQ
@@ -112,7 +112,7 @@ The payoff shows up on every request after that: the API server verifies the sig
 | | JWT (self-contained) | Opaque token | Session cookie |
 |---|---|---|---|
 | Validation | Local signature check | Introspection call to auth server | Server-side store lookup |
-| Revocation | Hard (see mitigations above) | Instant (delete server record) | Instant (delete server record) |
+| Revocation | Hard — needs explicit mitigation | Instant (delete server record) | Instant (delete server record) |
 | Payload visible to client | Yes (base64, not encrypted) | No — meaningless string | No |
 | Scales across services without shared state | Yes | No (needs introspection endpoint) | No (needs shared session store) |
 | Typical use | Multi-service APIs, mobile, third-party consumption | High-security APIs wanting instant revocation | First-party server-rendered web apps |

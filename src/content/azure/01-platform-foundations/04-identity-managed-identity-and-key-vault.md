@@ -9,7 +9,7 @@ tags: [azure, identity, managed-identity, key-vault]
 
 ## Microsoft Entra ID basics
 
-Microsoft Entra ID (formerly Azure AD) is Azure's identity provider — a directory of users, groups, and application identities, issuing OAuth 2.0/OIDC tokens that Azure services trust. Every Azure tenant has exactly one Entra ID directory. Two identity types matter for service-to-service auth:
+Microsoft Entra ID (formerly Azure AD) is Azure's identity provider — the directory behind an Azure tenant, holding users, groups, and application identities and issuing OAuth 2.0/OIDC tokens that Azure services trust. An Azure subscription is associated with one tenant/directory at a time, while large organisations can operate more than one tenant. Two identity types matter for service-to-service auth:
 
 | Identity type | What it represents | Has credentials you manage? |
 |---|---|---|
@@ -99,7 +99,7 @@ Key Vault supports automatic rotation policies for its own generated secrets and
 
 App Service and Functions support **Key Vault references** directly in application settings, so config looks like a normal app setting but is actually resolved from Key Vault at runtime using the app's own managed identity — no SDK code required in the app at all.
 
-```
+```bash
 # App Service application setting value:
 @Microsoft.KeyVault(SecretUri=https://myvault.vault.azure.net/secrets/SqlConnectionString/)
 ```
@@ -108,7 +108,7 @@ App Service resolves this using its managed identity, caches it, and automatical
 
 ## The "eliminate all connection strings" story
 
-This is the narrative interviewers are fishing for: instead of a SQL connection string with an embedded username/password sitting in App Service configuration (or worse, source control), the app's managed identity is granted a SQL database role directly (`CREATE USER [app-name] FROM EXTERNAL PROVIDER`), and the connection string contains only a server/database name plus `Authentication=Active Directory Managed Identity`. The same pattern extends to Storage (RBAC data roles instead of account keys), Service Bus (RBAC instead of shared access signatures), and Key Vault itself (RBAC instead of a stored vault credential) — the end state is zero long-lived secrets anywhere in config or code, and every credential is a short-lived token issued to a specific resource's identity.
+This is the narrative interviewers are fishing for: instead of a SQL connection string with an embedded username/password sitting in App Service configuration (or worse, source control), the app's managed identity is granted a SQL database role directly (`CREATE USER [app-name] FROM EXTERNAL PROVIDER`), and the connection string contains only a server/database name plus `Authentication=Active Directory Managed Identity` (the SQL client keyword still uses the legacy wording). The same pattern extends to Storage (RBAC data roles instead of account keys), Service Bus (RBAC instead of shared access signatures), and Key Vault itself (RBAC instead of a stored vault credential) — the end state is zero long-lived secrets anywhere in config or code, and every credential is a short-lived token issued to a specific resource's identity.
 
 ## Cheat sheet
 
@@ -160,7 +160,7 @@ Key Vault has two mutually exclusive authorization models — legacy vault acces
 
 ### Q6. How would you design secret rotation so that a database password change doesn't require restarting every app instance?
 
-I'd avoid the problem at the SQL layer entirely by using managed identity with Azure AD authentication to SQL Database instead of a username/password connection string — there's no password to rotate because there's no password. Where a secret genuinely can't be eliminated (a third-party API key, say), I'd set up the app to either re-read the secret from Key Vault on a periodic timer (short enough that the rotation window is acceptable, e.g. every 15–30 minutes) rather than only at startup, or subscribe to Key Vault's near-expiry/rotation Event Grid notification and reload on that signal for near-immediate propagation. The key design point to state explicitly: whichever mechanism you choose, the old and new secret typically need to both be valid for an overlap window, so instances that haven't refreshed yet don't fail mid-rotation.
+I'd avoid the problem at the SQL layer entirely by using managed identity with Microsoft Entra authentication to SQL Database instead of a username/password connection string — there's no password to rotate because there's no password. Where a secret genuinely can't be eliminated (a third-party API key, say), I'd set up the app to either re-read the secret from Key Vault on a periodic timer (short enough that the rotation window is acceptable, e.g. every 15–30 minutes) rather than only at startup, or subscribe to Key Vault's near-expiry/rotation Event Grid notification and reload on that signal for near-immediate propagation. The key design point to state explicitly: whichever mechanism you choose, the old and new secret typically need to both be valid for an overlap window, so instances that haven't refreshed yet don't fail mid-rotation.
 
 ### Q7. What's the difference between how Key Vault handles a "secret" versus a "key", and why does that distinction matter for compliance?
 

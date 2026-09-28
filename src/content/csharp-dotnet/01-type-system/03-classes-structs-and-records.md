@@ -20,7 +20,7 @@ Modern C# gives you four ways to define a type — `class`, `struct`, `record`, 
 | Typical use | Entities, services, behavior-heavy types | Small immutable values (`Point`, `Money`) | DTOs, value objects, messages | Small immutable value objects needing structural equality |
 
 > [!KEY]
-> `record` is not a fifth kind of storage — it's a set of compiler-generated members (`Equals`, `GetHashCode`, `ToString`, `with`, deconstruction) layered on top of either a `class` (default) or a `struct` (`record struct`). The storage question (value vs reference) is orthogonal to the equality question (identity vs value).
+> `record` is not a fifth kind of storage — it's a set of compiler-generated members (`Equals`, `GetHashCode`, `ToString`, `with`, deconstruction) layered on top of either a `class` (default) or a `struct` (`record struct`, added in C# 10). The storage question (value vs reference) is orthogonal to the equality question (identity vs value).
 
 ## Positional records, with-expressions, deconstruction
 
@@ -188,7 +188,7 @@ Records support inheritance (unlike structs, which cannot inherit from anything 
 
 ### Q10. Can two different record types with identical property values ever compare equal with `==`?
 
-No — this is guarded by the `EqualityContract` mechanism mentioned above. Even if `record A(int X);` and `record B(int X);` are structurally identical, `new A(1) == new B(1)` does not compile at all (there's no implicit conversion and no shared base making `==` applicable), and even where a common base record exists, the generated equality checks that both sides report the same concrete runtime type before comparing properties. This differs from some other languages' "structural typing" where identical shapes are considered interchangeable — C# records are still nominally typed; only two instances of the *same* record type (or type hierarchy through inheritance) can ever be value-equal.
+No — this is guarded by records' generated `EqualityContract` mechanism. Even if `record A(int X);` and `record B(int X);` are structurally identical, `new A(1) == new B(1)` does not compile at all (there's no implicit conversion and no shared base making `==` applicable), and even where a common base record exists, the generated equality checks that both sides report the same concrete runtime type before comparing properties. This differs from some other languages' "structural typing" where identical shapes are considered interchangeable — C# records are still nominally typed; only two instances of the *same* record type (or type hierarchy through inheritance) can ever be value-equal.
 
 ### Q11. In production, you found a `Dictionary<CacheKey, T>` sporadically failing to find entries it should contain, where `CacheKey` is a mutable class. What's the likely cause, and how would records help?
 

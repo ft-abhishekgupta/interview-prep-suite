@@ -24,7 +24,7 @@ flowchart LR
 |---|---|---|---|
 | Count Rotations With Exactly K Equal Adjacent Pairs | Easy | Circular equal-pair count, adjust for the one boundary that changes | `O(n)` |
 | Count Good Cyclic Rotations | Medium | Fixed-size sliding window over the doubled array | `O(n)` |
-| Count Robot Groups | Medium | Interval merge, then a monotonic stack over speed | `O(n log n)` |
+| Count Robot Groups | Medium | Initial collapse, then a monotonic stack over speed | `O(n)` when positions are already sorted |
 | Minimum Cost Path With At Most K Turns | Hard | Dijkstra over an expanded `(row, col, direction, turns)` state | `O(V log V)` on the expanded graph |
 
 ## Count Rotations With Exactly K Equal Adjacent Pairs
@@ -72,7 +72,7 @@ class Solution {
 
         int good = 0;
         for (int i = len / 2; i < len + len / 2; i++) {
-            if (windowSum > total / 2) good++;
+            if (2L * windowSum > total) good++;
             windowSum += nums[i % len];
             windowSum -= nums[(i - len / 2 + len) % len];
         }
@@ -81,7 +81,7 @@ class Solution {
 }
 ```
 
-**What I learned.** `windowSum > total / 2` using integer division is safe here even though `total` can be odd — comparing an integer window sum against `floor(total / 2)` gives the same true/false answer as comparing `2 * windowSum > total` would, so there's no need to special-case parity or switch to floating point.
+**What I learned.** Compare with `2 * windowSum > total` rather than `windowSum > total / 2`. The doubled comparison is exact for odd totals, works for negative totals too, and still avoids floating point; using integer division would be wrong in Java for some negative totals because division truncates toward zero.
 
 > [!TIP]
 > "Every rotation shares a fixed-size prefix/suffix split" is a strong hint to think of the array doubled against itself, with the target window sliding one step per rotation — it converts an `O(n)`-per-rotation recomputation into one `O(n)` pass overall.
@@ -90,7 +90,7 @@ class Solution {
 
 **Problem.** Robots start at strictly increasing positions, each with a constant speed, and merge whenever the gap between two adjacent groups drops to at most `distance`. Merged groups adopt the position and speed of the rightmost member and never split again. Return the number of groups remaining after all possible merges, across all time.
 
-**Approach.** Split the problem into two passes. First, merge whatever is already touching at `t = 0` — scan left to right and collapse any adjacent pair whose gap is already at most `distance` into one group (taking the rightmost robot's position and speed). Second, account for merges that happen later as faster groups catch up to slower ones ahead: a group survives on its own forever only if there is no group anywhere ahead of it with a strictly smaller speed, because a strictly faster or equal-speed neighbor is either catching up to close the gap eventually or is falling equally behind and will never actually be caught. That "is there something slower ahead" question is exactly what a next-smaller-element scan with a monotonic stack answers in one linear pass.
+**Approach.** Split the problem into two passes. First, merge whatever is already touching at `t = 0` — scan left to right and collapse any adjacent pair whose gap is already at most `distance` into one group (taking the rightmost robot's position and speed). Second, account for merges that happen later as faster groups catch up to slower ones ahead: a group survives on its own forever only if there is no group anywhere ahead with a strictly smaller speed. If every group ahead is at least as fast, the gap never closes; the first slower group ahead is the merge target that collapses the chain. That "is there something slower ahead" question is exactly what a next-smaller-element scan with a monotonic stack answers in one linear pass.
 
 ```java
 class Solution {
@@ -205,7 +205,7 @@ class Solution {
 | Mistake | Fix |
 |---|---|
 | Regenerating and rescoring every rotation from scratch | Check what actually changes per rotation — usually just one boundary pair or window edge |
-| Comparing `windowSum > total / 2` with floating-point division out of caution about odd totals | Integer division already gives the correct strict-inequality answer here; no special-casing needed |
+| Comparing `windowSum > total / 2` with integer or floating-point division | Use `2 * windowSum > total`; it is exact for odd totals and avoids Java's truncation trap on negative totals |
 | Trying to simulate exact catch-up times between robots | If only the eventual merge/no-merge outcome matters, reduce it to a monotonic-stack ordering question |
 | Running plain Dijkstra on `(row, col)` when a turn/stop budget is part of the problem | Expand the state to include the budget dimension, e.g. `(row, col, direction, turnsUsed)` |
 | Treating a stale priority-queue entry as valid | Always recheck `cost > dist[state]` on dequeue and skip if it's outdated |
@@ -232,9 +232,9 @@ Because Dijkstra's correctness relies on the invariant that once you've found th
 
 Prioritize banking correct solutions on the problems you're confident about first, since contests typically score by problems fully solved, not partial credit for elegant-but-incomplete hard solutions. A correct, even inelegant, solution to an easy or medium problem is worth more than a half-working attempt at a hard one, especially early in the round when time pressure is lower and mistakes on "should be easy" problems are more costly relative to their point value. Once the problems you're confident about are solved and verified against the given examples, then it's reasonable to spend remaining time on the harder problem, ideally after skimming it early so you've had background time to think about it.
 
-### Q5. What's a fast way to test whether integer division is "safe" to use in place of a floating-point comparison, like `windowSum > total / 2`?
+### Q5. What's a fast way to avoid division mistakes in comparisons like "first half sum is greater than the second half"?
 
-Rewrite the comparison algebraically without division and check whether it still matches: `windowSum > total / 2` (integer division) is asking the same true/false question as `2 * windowSum > total` for all integers, regardless of whether `total` is even or odd, as long as `windowSum` is itself an integer. You can verify this by testing both odd and even values of `total` by hand — for `total = 5`, `total / 2 = 2`, so `windowSum > 2` matches `2 * windowSum > 5` for every integer `windowSum`. This kind of quick algebraic sanity check is faster and safer under time pressure than second-guessing yourself into an unnecessary floating-point rewrite, which introduces its own precision risks.
+Rewrite the comparison algebraically without division and keep it in integer arithmetic: "first half is greater than the second half" is `windowSum > total - windowSum`, which becomes `2 * windowSum > total`. That version handles odd totals naturally and avoids Java's integer-division behavior, especially for negative totals where truncation toward zero differs from mathematical floor. It also avoids floating-point precision risk. In code, keep the sums in `long` before doubling so the comparison does not overflow on large inputs.
 
 ### Q6. How do you recognize when a monotonic stack is the right tool in a problem that doesn't obviously mention "next greater/smaller element"?
 

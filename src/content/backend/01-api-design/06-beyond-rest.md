@@ -2,7 +2,7 @@
 title: Beyond REST
 description: Comparing GraphQL gRPC WebSockets and server-sent events against REST across schema streaming caching and tooling, with code and interview framing
 difficulty: Core
-tags: [api-design, graphql, grpc, websockets, sse, real-time]
+tags: [api-design, graphql, grpc, websockets, real-time]
 ---
 
 REST's request/response model quietly assumes three things: the client wants a fixed shape of data, the interaction is one request in and one response back, and a plain HTTP cache in front of it is useful. Plenty of real traffic breaks at least one of those assumptions — a mobile dashboard that needs wildly different fields per screen, an internal call where every microsecond of latency matters, or a feed that needs to keep pushing updates long after the request finished. GraphQL, gRPC, WebSockets and Server-Sent Events (SSE) each fix a different assumption; none of them replace REST wholesale, and knowing which one to reach for — and why — is exactly what separates "I've heard of GraphQL" from a defensible design decision.

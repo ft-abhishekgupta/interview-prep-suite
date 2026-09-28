@@ -38,7 +38,7 @@ Defaults: capacity **16**, load factor **0.75**. When `size > capacity * loadFac
 Colliding keys chain in a bucket. From Java 8, once a single bucket holds **8** entries *and* the table capacity is at least 64, that bucket **treeifies** — the linked list becomes a **red-black tree**, so lookups in a pathological bucket drop from O(n) to O(log n). If the bucket later shrinks to **6** entries it **untreeifies** back to a list.
 
 > [!KEY]
-> A broken `hashCode` that returns a constant funnels every key into one bucket. Before Java 8 that was O(n) per lookup; since Java 8 treeification softens it to O(log n) — but only if keys are `Comparable`. Fix the `hashCode`; do not rely on the tree.
+> A broken `hashCode` that returns a constant funnels every key into one bucket. Before Java 8 that was O(n) per lookup; since Java 8 treeification softens the worst bucket to O(log n) using a red-black tree, with tie-breakers even for non-`Comparable` keys. Fix the `hashCode`; do not rely on the tree.
 
 ## HashSet is a HashMap
 

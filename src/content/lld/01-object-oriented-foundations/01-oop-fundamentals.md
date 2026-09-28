@@ -240,7 +240,7 @@ Method chains on the *same* fluent object (`stream.filter(...).sorted(...)`) are
 | Mistake | Fix |
 |---|---|
 | Calling getters/setters "encapsulation" by itself | Encapsulation is the access control + invariant protection, not the existence of properties |
-| Using `new` (hiding) instead of `override` and not noticing | Always add `@Override`; the compiler then rejects a subclass method that doesn't actually override anything |
+| Accidentally overloading when you meant to override | Always add `@Override`; the compiler then rejects a subclass method whose signature does not actually override anything |
 | Modelling every has-a relationship as inheritance | Ask "is it truly substitutable?" before inheriting; default to composition |
 | Confusing aggregation and composition in a diagram | Ask "does the part's lifetime depend on the whole?" — if yes, composition |
 | Returning mutable internal collections from a getter | Return `List.copyOf(...)` or `Collections.unmodifiableList(...)` (or a defensive copy) |

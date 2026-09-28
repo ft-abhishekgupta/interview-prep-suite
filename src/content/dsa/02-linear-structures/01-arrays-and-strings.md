@@ -58,7 +58,9 @@ for (int i = 0; i < 1_000_000; i++)
 ```java
 // Rotate array right by k, in-place, O(n) time, O(1) space
 public void rotate(int[] a, int k) {
+    if (a.length == 0) return;
     k %= a.length;
+    if (k < 0) k += a.length;
     reverse(a, 0, a.length - 1);
     reverse(a, 0, k - 1);
     reverse(a, k, a.length - 1);
@@ -73,24 +75,24 @@ private void reverse(int[] a, int lo, int hi) {
 This "reverse the whole, then reverse the parts" idea reappears constantly: reversing words in a sentence in place, cyclic shifts, and rotating a matrix. Recognizing the pattern saves derivation time under pressure.
 
 > [!WARNING]
-> Always take `k %= a.length` first. A rotation amount larger than the array length is a very common off-by-crash bug — without the modulo you index out of bounds or do redundant full rotations.
+> Handle the empty array before `k %= a.length`, then normalise `k`. A rotation amount larger than the array length is a very common off-by-crash bug — without the modulo you index out of bounds or do redundant full rotations.
 
 ## String immutability and StringBuilder
 
-In Java, `String` is **immutable** (and UTF-16 internally): every operation that looks like mutation (`+=`, `replace`, `substring`) actually allocates a new string and copies. `substring(i, j)` is `O(j - i)`, not `O(1)`, because since Java 7 it copies the characters. Concatenating in a loop is the classic trap:
+In Java, `String` is **immutable**: every operation that looks like mutation (`+=`, `replace`, `substring`) actually allocates a new string and copies. Java exposes UTF-16 code units through `charAt`/`char`, while modern JVMs use compact internal storage when possible, so rely on the API semantics rather than the private representation. `substring(i, j)` is `O(j - i)`, not `O(1)`, because since Java 7 it copies the characters. Concatenating in a loop is the classic trap:
 
 ```java
 // O(n^2): each += allocates a new String and copies everything so far
 String s = "";
 for (char c : chars) s += c;
 
-// O(n) amortised: StringBuilder mutates an internal char buffer
+// O(n) amortised: StringBuilder mutates an internal buffer
 StringBuilder sb = new StringBuilder();
 for (char c : chars) sb.append(c);
 String result = sb.toString();
 ```
 
-`StringBuilder` behaves like a dynamic array of `char` internally — same geometric growth strategy, same amortised-O(1) append. If you need to reverse or shuffle characters in place, convert to `char[]` with `toCharArray()`, mutate, then build a new string with `new String(chars)` — you cannot mutate a `String` directly.
+`StringBuilder` behaves like a dynamic character buffer — same geometric growth strategy, same amortised-O(1) append. If you need to reverse or shuffle UTF-16 code units in place, convert to `char[]` with `toCharArray()`, mutate, then build a new string with `new String(chars)` — you cannot mutate a `String` directly.
 
 > [!DANGER]
 > Interviewers plant string-concatenation-in-a-loop deliberately. Even if your algorithm is otherwise `O(n)`, `s += c` silently makes it `O(n²)`. Say "I'll use a StringBuilder here to avoid quadratic string copies" out loud.
@@ -115,6 +117,12 @@ boolean isAnagram(String a, String b) {
 
 For Unicode or an unknown alphabet, fall back to `Map<Character, Integer>` — the pattern (build a count, compare counts) is identical.
 
+## Unicode and code-point traps
+
+Most interview string problems quietly assume lowercase English letters or ASCII, but senior candidates should call out the assumption. Java's `char` is a UTF-16 code unit, not necessarily a complete user-visible character. A character outside the Basic Multilingual Plane, such as many emoji, is represented by a surrogate pair and takes two `char` positions; combining marks can make even "one visible character" span multiple code points.
+
+For ordinary LeetCode-style anagram or sliding-window questions, `char` iteration is usually what the interviewer expects because the input constraint says lowercase letters. For production text processing, prefer code-point APIs (`s.codePoints()`) or a library that understands grapheme clusters. This changes constants and sometimes correctness: `s.length()` counts UTF-16 code units, not human-perceived characters, and `toCharArray()` can split a surrogate pair if you treat each `char` as independent.
+
 ## Choosing the right array pattern
 
 Most array problems reduce to one of a handful of patterns. Recognizing which one applies is the actual skill being tested.
@@ -126,7 +134,7 @@ Most array problems reduce to one of a handful of patterns. Recognizing which on
 | Sliding window | Contiguous subarray/substring, "at most k", longest/shortest | `O(n)` |
 | Prefix sum | Repeated range-sum queries, subarray sum equals k | `O(n)` build, `O(1)` query |
 | Sorting first | Order doesn't matter, need pairs/duplicates adjacent | `O(n log n)` |
-| Hash set/map | Need `O(1)` membership or frequency, order doesn't matter | `O(n)` |
+| Hash set/map | Need `O(1)` average membership or frequency, order doesn't matter | `O(n)` |
 | Monotonic stack | Next greater/smaller element | `O(n)` |
 
 If the array is already sorted, always ask yourself whether two pointers or binary search removes a factor of `n` before reaching for a hash map — that single question resolves most "can this be faster" follow-ups.
@@ -178,7 +186,7 @@ Use two pointers starting at both ends, swap, and move inward until they cross �
 
 ### Q5. You need to check if two strings are anagrams. Walk through your approach and its complexity.
 
-If the alphabet is small and known (say lowercase English letters), allocate a fixed `int[26]` count array, increment for each character of the first string, decrement for each character of the second, and fail early if any count goes negative or the lengths differ. This is `O(n)` time and `O(1)` space, since 26 is a constant. An alternative is sorting both strings and comparing — `O(n log n)` time, `O(1)` extra if sorting in place — which is simpler to write but asymptotically worse; I'd mention both and justify picking the counting approach for performance.
+If the alphabet is small and known (say lowercase English letters), allocate a fixed `int[26]` count array, increment for each character of the first string, decrement for each character of the second, and fail early if any count goes negative or the lengths differ. This is `O(n)` time and `O(1)` space, since 26 is a constant. An alternative is sorting both strings and comparing — `O(n log n)` time and, in Java, `O(n)` extra space because strings are immutable and you sort `char[]` copies — which is simpler to write but asymptotically worse; I'd mention both and justify picking the counting approach for performance.
 
 ### Q6. How does Java represent 2-D arrays, and what's the difference between a rectangular grid and a jagged array?
 

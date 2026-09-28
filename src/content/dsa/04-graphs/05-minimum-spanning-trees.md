@@ -25,7 +25,7 @@ flowchart LR
 
 ## The cut property and the cycle property
 
-These two properties are why the greedy algorithms below are correct, not just heuristics.
+These two properties are why MST greedy algorithms are correct, not just heuristics.
 
 | Property | Statement | Used by |
 |---|---|---|
@@ -117,6 +117,14 @@ Vertices `{A, B, C, D}`, edges `A-B(1), B-C(2), A-C(4), C-D(3), B-D(5)`.
 - **Kruskal:** sort → `A-B(1), B-C(2), C-D(3), A-C(4), B-D(5)`. Take `A-B` (1), take `B-C` (2), take `C-D` (3) — three edges, four vertices, done. Total weight `6`. `A-C` and `B-D` are skipped because they would close a cycle.
 - **Prim from A:** frontier `{A-B(1), A-C(4)}` → take `A-B`. Frontier `{A-C(4), B-C(2), B-D(5)}` → take `B-C`. Frontier `{A-C(4), C-D(3), B-D(5)}` → take `C-D`. Same total weight `6`, same tree — confirming both greedy strategies converge on the optimum.
 
+## Handling disconnected input
+
+An MST requires connectivity, so code should prove it got a real spanning tree rather than silently returning the weight of a partial result. In Kruskal, count accepted edges and require exactly `V - 1`; in Prim, count visited vertices and require exactly `V`. If the check fails, return a sentinel, throw, or explicitly report a minimum spanning forest depending on the problem statement.
+
+For a forest, the same greedy ideas still work component by component. Kruskal naturally produces a minimum spanning forest if you simply continue scanning all edges without expecting `V - 1` accepted edges. Prim can do the same by restarting from each unvisited vertex and accumulating one tree per component. State this distinction in interviews: "no MST" for disconnected graphs, "minimum spanning forest" if the caller wants best effort per component.
+
+Negative edge weights do not break MST algorithms. Unlike shortest paths, there is no danger of looping around a negative cycle because a spanning tree is acyclic by definition. Kruskal will simply sort negative edges first, and Prim will happily choose a negative frontier edge when it is the cheapest safe connection.
+
 ## Real-world applications
 
 | Domain | How MST is used |
@@ -198,7 +206,7 @@ Build a complete graph where nodes are data points and edge weights are pairwise
 
 ### Q11. What's the difference between MST and a shortest-path tree, and why can't you reuse Dijkstra's tree as an MST?
 
-A shortest-path tree (as built by Dijkstra or BFS) minimizes the distance from **one specific source** to every other node; an MST minimizes the **total weight of all edges** in the tree, with no notion of a distinguished source. These can be genuinely different trees: consider a triangle `A-B(1), B-C(1), A-C(10)` — the MST drops the edge `A-C` entirely (total weight 2), but Dijkstra's shortest-path tree from `C` might still prefer going through `B` too, so in this example they coincide, but in general, minimizing per-node distances from a root and minimizing total tree weight are different optimization objectives and can diverge on more complex graphs with more vertices.
+A shortest-path tree (as built by Dijkstra or BFS) minimizes the distance from **one specific source** to every other node; an MST minimizes the **total weight of all edges** in the tree, with no notion of a distinguished source. These can be genuinely different trees: in a triangle `A-B(10), A-C(10), B-C(1)`, Dijkstra from `A` chooses direct edges `A-B` and `A-C` so both nodes are distance 10 from `A`, total tree weight 20. The MST chooses `B-C(1)` plus one of the 10-weight edges, total 11. The objectives are different: shortest paths optimise per-destination distance from a root, while MST optimises global connection cost.
 
 ### Q12. If asked to find the *maximum* spanning tree, what would you change?
 

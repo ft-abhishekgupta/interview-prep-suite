@@ -59,7 +59,7 @@ flowchart TD
 
 A closed-model measurement bug that inflates apparent performance: if a request takes far longer than expected, the *next* request from that same virtual user is delayed in starting — so the tool never measures the wait that a real, independently-arriving user would have experienced during that stall. The result is that reported percentiles look better than reality, sometimes dramatically so, especially at the tail.
 
-```
+```text
 Real open-model arrivals every 100ms: request 1 issued at t=0, expected next at t=100ms
 System stalls: request 1 takes 5000ms
 Closed model:  next request only issued at t=5000ms (waited for the stall) — that 4900ms "missing" wait is never recorded
@@ -84,7 +84,7 @@ Tools aware of this (later versions of `wrk2`, Gatling, k6 with the right config
 
 Plotting latency (or error rate) against increasing load reveals a "knee" — the point where latency stops growing linearly with load and starts growing sharply, usually because some resource (a connection pool, a thread pool, a CPU core) has saturated and requests start queueing.
 
-```
+```text
 Throughput →
 Latency
   |                                    ___/
@@ -136,6 +136,47 @@ A load test against a checkout API at a target of 500 rps (open model) reports: 
 
 The senior read: the p50 looks healthy, but the p99 is 40x the p50 — a strong sign of queueing, not uniformly slow processing, and the near-saturated connection pool is the prime suspect (requests waiting for a free connection would show exactly this pattern — fast when a connection is free, very slow when queued behind others). The fix to investigate first is connection pool sizing (and whether the database itself, not just the pool, is the actual bottleneck) before anything else — profiling would confirm whether pool wait time or actual query time is the dominant contributor to that p99.
 
+## Tool choices and micro-benchmarks
+
+Tool choice should follow the protocol, workload model and team ecosystem. A JavaScript-friendly platform team may choose k6, a JVM-heavy performance team may choose Gatling, and a .NET backend team may prefer NBomber because scenarios are written in C# and can reuse internal clients.
+
+| Tool | Scripting language | Model | Best for | Main limitation |
+|---|---|---|---|---|
+| k6 | JavaScript | Code-first load tests with strong CI output | Modern HTTP, gRPC and WebSocket checks in pipelines | JavaScript runtime is not a browser and complex protocols may need extensions |
+| JMeter | GUI plans plus plugins and scripts | Thread and sampler based test plans | Enterprise estates with many protocols such as HTTP, JDBC and JMS | Heavy plans can be hard to version, review and keep realistic |
+| Gatling | Scala or Java DSL | Scenario-based virtual users with strong reports | High-scale HTTP tests and detailed latency analysis | JVM and DSL learning curve can be high for non-JVM teams |
+| Locust | Python | User behavior classes executed by distributed workers | Python teams and custom workflows that need ordinary code | Requires careful worker sizing or the generator becomes the bottleneck |
+| NBomber | C# and F# | Step and scenario based load simulations | .NET services, service clients, queues and protocol mixes | Smaller ecosystem than JMeter or k6 and less universal hiring familiarity |
+
+None of these tools replaces observability on the system under test. A load tool can tell you response time, throughput and errors from the client side; it cannot by itself tell you whether the root cause is a database pool, GC pause, lock contention or downstream dependency.
+
+### BenchmarkDotNet is not a load test
+
+BenchmarkDotNet measures a small piece of code in-process: parsing, serialization, allocation-heavy transformations, hashing, routing helpers, custom collections. It does not answer whether an API survives 1,000 rps, because it does not include the deployed service, network, database, thread pool pressure or realistic concurrency.
+
+Do not benchmark serious .NET code with `Stopwatch` in a loop. That usually measures JIT warm-up, tiered compilation, dead-code elimination, GC noise, CPU frequency changes and harness overhead. BenchmarkDotNet handles warm-up, multiple iterations, statistical summaries and diagnosers.
+
+```csharp
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Running;
+
+[MemoryDiagnoser]
+public class OrderParserBenchmarks
+{
+    private readonly string _json = "{\"id\":42,\"total\":99.95}";
+
+    [Benchmark]
+    public OrderDto ParseOrder() => OrderParser.Parse(_json);
+}
+
+public static class Program
+{
+    public static void Main() => BenchmarkRunner.Run<OrderParserBenchmarks>();
+}
+```
+
+`[MemoryDiagnoser]` reports allocations, bytes allocated per operation and garbage collection counts. That is valuable when p99 latency points toward allocation pressure or GC pauses, but it is still a microscope for one code path. Use it after profiling suggests a hot method matters; use load tests to validate the whole system under realistic traffic.
+
 ## Cheat sheet
 
 - Smoke, load, stress, spike, soak, breakpoint each answer a different question — pick deliberately, don't rely on just one.
@@ -146,6 +187,8 @@ The senior read: the p50 looks healthy, but the p99 is 40x the p50 — a strong 
 - The "knee of the curve" (where latency starts growing much faster than load) is usually the practical capacity number, not the point of total collapse.
 - Load testing finds where to look; profiling finds what's actually wrong.
 - Shadow traffic and CI regression gates extend performance testing beyond one-off pre-launch events.
+- k6, JMeter, Gatling, Locust and NBomber are workload tools; choose by protocol, ecosystem and CI fit.
+- BenchmarkDotNet is for in-process micro-benchmarks and allocation analysis, not service capacity.
 
 ## Common mistakes
 
@@ -157,10 +200,12 @@ The senior read: the p50 looks healthy, but the p99 is 40x the p50 — a strong 
 | Testing only "load" and skipping stress/soak/spike | Run the type that matches the actual risk being investigated |
 | Load testing on an undersized environment and reporting numbers as absolute capacity | Use a production-sized environment for absolute numbers; smaller environments only for relative regression comparisons |
 | Treating the point of total failure as the usable capacity | Use the knee of the latency curve, which usually appears well before total failure |
+| Using `Stopwatch` loops as micro-benchmarks | Use BenchmarkDotNet so warm-up, JIT, GC and allocation noise are handled properly |
+| Choosing a load tool because it is popular | Match tool, protocol, scripting language and workload model to the team's system |
 
 ## Summary
 
-Performance testing is precise work: choosing the right test type for the question being asked, building a workload model from real traffic rather than guesswork, and correctly distinguishing open from closed arrival models so tail latency isn't silently hidden by coordinated omission. Measuring percentiles, error rate, and the saturation of the system under test (not the generator) turns a load test into an actionable result, and the knee of the latency curve is usually the number worth planning capacity around. A load test tells you where to look; profiling tells you what's actually wrong, and shadow traffic plus CI regression gates extend the discipline beyond a single pre-launch event into an ongoing practice.
+Performance testing is precise work: choosing the right test type for the question being asked, building a workload model from real traffic rather than guesswork, and correctly distinguishing open from closed arrival models so tail latency isn't silently hidden by coordinated omission. Measuring percentiles, error rate, and the saturation of the system under test (not the generator) turns a load test into an actionable result, and the knee of the latency curve is usually the number worth planning capacity around. Tools such as k6, JMeter, Gatling, Locust and NBomber generate workload; BenchmarkDotNet measures local code paths. A load test tells you where to look, profiling and micro-benchmarks explain what is hot, and shadow traffic plus CI regression gates keep the discipline ongoing.
 
 ## Top Interview Questions
 
@@ -204,9 +249,9 @@ A soak test sustains a moderate, realistic load for a long duration (hours to da
 
 Run a small, fast, fixed-load performance test (not a full-scale load test — that would be too slow for every build) against a representative environment on a schedule (nightly, or on every merge to main), capturing key metrics like p95 latency and error rate, and compare them against a stored baseline from the last known-good run, failing the build if the regression exceeds a threshold (e.g., p95 worse by more than 10%). The trade-off is fidelity versus speed and cost: a lightweight, small-scale test that runs frequently catches regressions early — while they're a small, easy-to-bisect diff — but at lower fidelity than a full production-scale test, so it won't catch every capacity-related issue; a full-scale test gives higher confidence but is too slow and expensive to run on every commit, so it's reserved for periodic or pre-release milestones.
 
-### Q11. What is shadow (dark) traffic testing, and when would you use it over a synthetic load test?
+### Q11. Why is BenchmarkDotNet not a replacement for a load test?
 
-Shadow traffic duplicates real, live production requests and sends a copy to a new version of the system (a candidate release, a re-architected service) without returning that copy's response to the real user — the duplicate response is either discarded or compared against the real one for correctness and performance, with zero user-facing risk since only the original response is ever served. It's the highest-fidelity performance validation possible, since the traffic pattern, payload distribution, and even user behaviour quirks are genuinely real rather than modeled — which makes it valuable specifically when you don't fully trust a synthetic workload model to capture reality (a major rewrite, a new caching layer, a new data store) or when building an accurate synthetic model would itself be very difficult. It's more operationally complex to set up (need to safely duplicate and route traffic, need a comparison/discard mechanism) so it's typically reserved for high-stakes changes rather than everyday regression testing.
+BenchmarkDotNet measures a small piece of .NET code inside one process, such as a parser, serializer, mapper or allocation-heavy hot method. It handles warm-up, tiered JIT behaviour, repeated iterations, statistics and diagnosers like `[MemoryDiagnoser]`, which a `Stopwatch` loop does not. A load test measures a deployed system under concurrent traffic: network, HTTP stack, thread pool, database, queues, caches, downstream dependencies and realistic request arrival patterns. The two answer different questions. Use load testing to discover that p99 latency degrades and profiling to identify a hot path; then use BenchmarkDotNet to compare candidate fixes for that hot path. Passing a micro-benchmark says nothing about service capacity by itself.
 
 ### Q12. A stakeholder asks "what's our system's capacity?" after a load test. How do you answer precisely rather than giving a single vague number?
 

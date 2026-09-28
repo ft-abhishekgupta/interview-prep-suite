@@ -37,7 +37,7 @@ An object that survives a Gen 0 collection is **promoted** to Gen 1; survive aga
 
 Each collection runs three conceptual phases:
 
-1. **Mark** — starting from the roots (see below), walk every reachable object and mark it "alive".
+1. **Mark** — starting from GC roots such as stacks, statics, registers and handles, walk every reachable object and mark it "alive".
 2. **Sweep** — anything not marked is garbage; its memory is reclaimable.
 3. **Compact** — surviving objects are moved together to eliminate gaps, so the heap stays contiguous and allocation remains a cheap pointer bump.
 

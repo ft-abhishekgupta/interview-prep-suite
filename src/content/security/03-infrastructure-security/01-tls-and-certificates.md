@@ -27,7 +27,7 @@ TLS uses both, because each is good at a different job: asymmetric (public/priva
 
 ```mermaid
 graph LR
-    A["Asymmetric crypto<br/>RSA / ECDHE"] --> B["Authenticate server<br/>+ agree a shared secret"]
+    A["Asymmetric crypto<br/>ECDHE + RSA/ECDSA signatures"] --> B["Authenticate server<br/>+ agree a shared secret"]
     B --> C["Derive symmetric session key"]
     C --> D["Symmetric crypto<br/>AES-GCM / ChaCha20"]
     D --> E["Encrypt all application data"]
@@ -40,9 +40,10 @@ sequenceDiagram
     participant Client
     participant Server
     Client->>Server: ClientHello (supported ciphers, TLS version, random)
-    Server-->>Client: ServerHello + Certificate + ServerKeyExchange
+    Server-->>Client: ServerHello + Certificate + signed ECDHE key share
     Client->>Client: Validate cert chain against trusted roots
-    Client->>Server: ClientKeyExchange (pre-master secret, encrypted with server's public key)
+    Client->>Server: ClientKeyExchange (client ECDHE key share)
+    Note over Client,Server: Both derive a session key from the ephemeral shared secret
     Client->>Server: ChangeCipherSpec, Finished
     Server-->>Client: ChangeCipherSpec, Finished
     Note over Client,Server: TLS 1.2 — two round trips before application data
@@ -57,7 +58,7 @@ TLS 1.3 collapses this to a **single round trip**: the client guesses the server
 
 A certificate binds a public key to an identity (a domain name) and is signed by a Certificate Authority (CA). Browsers and OSes ship with a small set of trusted **root CAs**; everything else is trusted transitively.
 
-```
+```text
 Root CA (trusted by OS/browser, offline, rarely used directly)
    └── Intermediate CA (does the day-to-day signing)
          └── Leaf certificate (issued to your domain)
@@ -69,7 +70,7 @@ When a client connects, it checks:
 |---|---|
 | Chain builds to a trusted root | Untrusted issuer — most browsers hard-fail |
 | Signature valid at each link | Certificate tampered with or forged |
-| Not expired (`notBefore`/`notAfter`) | Classic outage — see below |
+| Not expired (`notBefore`/`notAfter`) | Classic full-site outage when renewal fails |
 | Hostname matches `CN`/`SAN` | Wrong-domain cert, blocked as a MITM risk |
 | Not revoked (CRL/OCSP) | Compromised key still being trusted |
 
@@ -159,7 +160,7 @@ In TLS 1.2, the client sends a `ClientHello` listing supported ciphers; the serv
 
 ### Q4. What is the chain of trust, and what does a client actually check when validating a certificate?
 
-A leaf certificate for your domain is signed by an intermediate CA, which is itself signed by a root CA that ships pre-trusted in the OS or browser's trust store — validation walks this chain, verifying each signature, until it reaches a trusted root. Along the way, the client checks that the chain is unbroken and each signature is valid, that the certificate hasn't expired (`notBefore`/`notAfter`), that the hostname being connected to matches the certificate's `CN` or Subject Alternative Names, and that the certificate hasn't been revoked, checked via a CRL or OCSP responder. Any single failure — an expired cert, a mismatched hostname, an untrusted root — causes browsers to hard-fail the connection rather than silently downgrade, because a soft failure would be trivially exploitable by a man-in-the-middle.
+A leaf certificate for your domain is signed by an intermediate CA, which is itself signed by a root CA that ships pre-trusted in the OS or browser's trust store — validation walks this chain, verifying each signature, until it reaches a trusted root. Along the way, the client checks that the chain is unbroken and each signature is valid, that the certificate hasn't expired (`notBefore`/`notAfter`), that the hostname being connected to matches the certificate's `CN` or Subject Alternative Names, and, where revocation information is available, that the certificate hasn't been revoked through CRL/OCSP. Expiry, hostname mismatch, or an untrusted issuer cause browsers to hard-fail rather than silently downgrade; revocation checking is more nuanced because clients often soft-fail OCSP network errors unless OCSP stapling or stricter policy is in place.
 
 ### Q5. What is certificate pinning, and why do many teams avoid it despite the extra security?
 

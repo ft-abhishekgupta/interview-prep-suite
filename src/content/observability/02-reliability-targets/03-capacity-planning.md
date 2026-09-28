@@ -40,7 +40,7 @@ Run a load test that steps load upward (not a single fixed-rate run) and plot la
 
 Once you know one instance's safe throughput, scaling out is arithmetic — with an important caveat about shared, non-horizontally-scaled resources.
 
-```
+```text
 instances needed = ceil(target peak RPS / safe RPS per instance) + spare capacity for N+1
 ```
 

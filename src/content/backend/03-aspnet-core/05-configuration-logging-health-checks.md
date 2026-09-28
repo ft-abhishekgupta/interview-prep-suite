@@ -31,7 +31,7 @@ flowchart LR
 | 6 | Key Vault / AWS Secrets Manager / etc. | Secrets pulled from a managed secret store at startup |
 
 > [!KEY]
-> Precedence is registration order, not the order above by convention — `WebApplication.CreateBuilder` registers them in this order by default, but if you add providers manually, whichever is added **last** wins for a duplicate key.
+> Precedence is registration order, not the listed order by convention — `WebApplication.CreateBuilder` registers them in this order by default, but if you add providers manually, whichever is added **last** wins for a duplicate key.
 
 ## Environment variables and Key Vault
 
@@ -67,7 +67,7 @@ builder.Services.AddOptions<SmtpOptions>()
 
 ## Validation on start
 
-`ValidateOnStart()` (added in .NET 8, paired with `ValidateDataAnnotations()` or a custom `IValidateOptions<T>`) moves configuration errors from "the first request that touches this option" to "the process refuses to start", which is a strictly better failure mode — a crash-looping pod in a deploy pipeline is far easier to diagnose than a service that starts fine and fails silently on the first real request.
+`ValidateOnStart()` (available since .NET 6 and commonly paired with `ValidateDataAnnotations()` or a custom `IValidateOptions<T>`) moves configuration errors from "the first request that touches this option" to "the process refuses to start", which is a strictly better failure mode — a crash-looping pod in a deploy pipeline is far easier to diagnose than a service that starts fine and fails silently on the first real request.
 
 ```csharp
 public class SmtpOptionsValidator : IValidateOptions<SmtpOptions>

@@ -44,7 +44,7 @@ Systems change independently — a producer service ships before a consumer upgr
 
 | Gotcha | Newtonsoft default | System.Text.Json default |
 |---|---|---|
-| Property casing | Matches C# `PascalCase` unless configured | Case-*insensitive* read by default, but *writes* the C# casing unless a naming policy is set |
+| Property casing | Flexible name matching and configurable contract resolver | Library default is case-sensitive and writes C# casing; ASP.NET Core web defaults use camelCase and case-insensitive reads |
 | Polymorphic serialization | Supported out of the box (`TypeNameHandling`) | Requires explicit `[JsonDerivedType]`/`JsonPolymorphic` (added in .NET 7+) |
 | Circular references | Configurable (`ReferenceLoopHandling`) | Throws by default; needs `ReferenceHandler.Preserve` |
 | `DateTime` handling | Flexible, some implicit conversions | Strict ISO 8601 by default; less forgiving of odd formats |
@@ -149,7 +149,7 @@ Protobuf assigns every field a permanent numeric tag, and the wire format encode
 
 ### Q3. What are the key gotchas when migrating a .NET codebase from Newtonsoft.Json to System.Text.Json?
 
-Casing behaves differently: STJ reads case-insensitively by default but writes using the exact C# property casing unless you configure a naming policy, whereas Newtonsoft's defaults and options differ enough to cause subtly different output. Polymorphic serialization (serializing a base type and getting the derived type back) worked out of the box with Newtonsoft's `TypeNameHandling`, but STJ requires explicit `[JsonDerivedType]`/`JsonPolymorphic` attributes (added in .NET 7) or custom converters. Circular object references throw by default in STJ, where Newtonsoft could be configured more leniently; and `DateTime` parsing is stricter and culture-invariant in STJ versus Newtonsoft's more forgiving, sometimes culture-sensitive behaviour. Because these only surface when the specific code path is exercised — a polymorphic payload, a circular graph, an odd date format — they're a common source of runtime bugs that unit tests miss if they don't specifically target those cases.
+Casing behaves differently: raw STJ library defaults are case-sensitive on read and write C# property names unless you configure options, while ASP.NET Core's web defaults use camelCase and case-insensitive reads; Newtonsoft's contract resolver settings differ enough to cause subtly different output. Polymorphic serialization (serializing a base type and getting the derived type back) worked out of the box with Newtonsoft's `TypeNameHandling`, but STJ requires explicit `[JsonDerivedType]`/`JsonPolymorphic` attributes (added in .NET 7) or custom converters. Circular object references throw by default in STJ, where Newtonsoft could be configured more leniently; and `DateTime` parsing is stricter and culture-invariant in STJ versus Newtonsoft's more forgiving, sometimes culture-sensitive behaviour. Because these only surface when the specific code path is exercised — a polymorphic payload, a circular graph, an odd date format — they're a common source of runtime bugs that unit tests miss if they don't specifically target those cases.
 
 ### Q4. Why is deserialising untrusted input with type-name-based polymorphism a security risk?
 

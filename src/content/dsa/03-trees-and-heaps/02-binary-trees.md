@@ -49,7 +49,7 @@ class TreeNode {
 
 ## Traversals
 
-```
+```text
         1
        / \
       2   3
@@ -202,7 +202,7 @@ A **B-tree** generalises the same balancing idea from 2 children per node to `m`
 | Typical use | In-memory sorted maps, read-heavy | `TreeMap`, `std::map`, Linux CFS scheduler | Database indexes, filesystems |
 
 > [!NOTE]
-> The BST invariant, the two-child delete case, the min/max validation bug, and AVL-vs-red-black trade-offs are each worth a full pass on their own — see the binary search trees page for the mechanics. The takeaway here is structural: a BST is a binary tree plus an ordering rule, and AVL/red-black/B-trees are three different ways of bounding that tree's height so `O(log n)` actually holds.
+> The takeaway is structural: a BST is a binary tree plus an ordering rule, and AVL, red-black and B-trees are three different ways of bounding height so `O(log n)` actually holds. The important mechanics are the global subtree invariant, the successor/predecessor delete case, and rotations or high fanout to prevent degeneration.
 
 ## Path sum
 

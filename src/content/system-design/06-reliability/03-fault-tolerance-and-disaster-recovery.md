@@ -39,7 +39,7 @@ flowchart LR
 | **Active-passive** | Standby replica kept in sync, promoted on failure | Seconds to minutes (promotion + DNS/routing) | Medium — standby is idle |
 | **Active-active** | Multiple replicas serve traffic simultaneously | None — traffic just shifts away from the failed one | High — full duplicate capacity, plus conflict handling |
 
-Active-active gives the best failover time because there's no promotion step, but it requires handling concurrent writes to multiple active copies (see the multi-region page for conflict resolution) — that complexity is the real cost, not just the extra hardware.
+Active-active gives the best failover time because there's no promotion step, but it requires handling concurrent writes to multiple active copies — that conflict-resolution complexity is the real cost, not just the extra hardware.
 
 ## Graceful degradation and load shedding
 

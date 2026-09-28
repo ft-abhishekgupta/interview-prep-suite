@@ -137,6 +137,14 @@ public boolean hasSubarrayWithSum(int[] nums, int target) {
 > [!WARNING]
 > The complexity argument only holds if the work done inside the shrink loop per step is `O(1)` (or amortised `O(1)`, like a dictionary update). If shrinking recomputes something expensive from scratch each time, the whole algorithm silently becomes `O(n²)` again — watch for this when window state is more complex than a simple counter or frequency map.
 
+## Choosing the invariant
+
+The safest way to derive a sliding-window solution is to name the invariant before writing code. For "longest valid" problems, the invariant is usually "the current window satisfies the constraint"; expand right, shrink while invalid, then record the length. For "shortest covering" problems, the invariant flips: once the window satisfies the requirement, keep shrinking while it remains satisfied, recording every valid candidate before removing the left edge. For counting problems, decide whether each valid window contributes one answer or many; in `atMost(K)`, a valid window ending at `right` contributes `right - left + 1` subarrays because every start between `left` and `right` is also valid.
+
+That distinction prevents two common bugs. First, updating the answer before repairing an invalid max window can record illegal windows. Second, updating only after a min-window shrink can miss the best candidate because the window becomes invalid immediately after removing the critical character or value. Narrating whether you are maintaining validity or deliberately tightening a valid window makes the code much easier to debug.
+
+When the window state is a frequency map, keep a separate counter for the property you care about, such as `distinct`, `formed`, or `violations`. Recomputing that property by scanning the whole map on every step breaks the linear-time guarantee even though the pointer movement remains linear.
+
 ## Cheat sheet
 
 - Fixed window: maintain a running sum/count, add the new element, subtract the one leaving `k` steps behind.

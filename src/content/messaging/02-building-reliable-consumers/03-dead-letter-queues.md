@@ -5,7 +5,7 @@ difficulty: Core
 tags: [messaging, dead-letter-queue, monitoring, service-bus]
 ---
 
-A dead letter queue (DLQ) is where messages go when the system has given up on normal processing — and how a team treats that queue says more about their operational maturity than almost any other messaging metric. This section covers what lands there, how to triage it safely, and why replay is more dangerous than it looks.
+A dead letter queue (DLQ) is where messages go when the system has given up on normal processing — and how a team treats that queue says more about their operational maturity than almost any other messaging metric. The operational skill is understanding what lands there, how to triage it safely, and why replay is more dangerous than it looks.
 
 The shape is simple even when the failure modes behind it aren't: a producer sends and forgets, a consumer pulls and processes, and only after the Nth retry does a message get diverted into the DLQ instead of back onto the main queue.
 
@@ -77,8 +77,10 @@ public async Task ReplayBatchAsync(string deadLetterPath, string mainQueuePath, 
     var messages = await dlqReceiver.ReceiveMessagesAsync(batchSize);
     foreach (var msg in messages)
     {
-        // Clone rather than resend the original — avoids broker-level id confusion
-        var clone = new ServiceBusMessage(msg.Body) { MessageId = msg.MessageId };
+        // Give the broker send a fresh MessageId so duplicate-detection windows do not drop
+        // the replay, while preserving the original logical ID for consumer idempotency.
+        var clone = new ServiceBusMessage(msg.Body) { MessageId = Guid.NewGuid().ToString() };
+        clone.ApplicationProperties["OriginalMessageId"] = msg.MessageId;
         clone.ApplicationProperties["ReplayedFrom"] = "dlq";
         await sender.SendMessageAsync(clone);
         await dlqReceiver.CompleteMessageAsync(msg); // remove from DLQ only after resend succeeds

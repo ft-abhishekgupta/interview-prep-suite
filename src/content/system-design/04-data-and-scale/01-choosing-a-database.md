@@ -27,13 +27,13 @@ Before naming a database, answer five questions about the data itself. The answe
 | Type | Data shape | Best access pattern | Consistency | Scale model | Examples |
 |---|---|---|---|---|---|
 | **Relational (SQL)** | Rows in tables, fixed schema, relationships via foreign keys | Joins, transactions, ad-hoc queries | Strong (ACID) by default | Vertical first, then read replicas / sharding | PostgreSQL, MySQL, Azure SQL |
-| **Document** | Semi-structured JSON/BSON documents | Fetch/update a whole entity by key, flexible schema per document | Tunable (often eventual by default, strong optional) | Horizontal by design (partition key) | MongoDB, Cosmos DB (NoSQL API), Couchbase |
+| **Document** | Semi-structured JSON/BSON documents | Fetch/update a whole entity by key, flexible schema per document | Tunable; defaults vary (primary/session consistency is common) | Horizontal by design (partition key) | MongoDB, Cosmos DB (NoSQL API), Couchbase |
 | **Key-value** | Opaque value behind a key, no query language | Point lookups by key only | Eventual or tunable, very fast | Horizontal, near-linear scale | Redis, DynamoDB, Memcached |
 | **Wide-column** | Rows with dynamic, sparse columns grouped into column families | Range scans over a partition key + sort key | Tunable, usually eventual | Built for massive horizontal scale | Cassandra, HBase, Bigtable |
 | **Graph** | Nodes and edges with properties | Traversals, "friends of friends", shortest path | Varies by engine | Harder to shard (traversals cross partitions) | Neo4j, Amazon Neptune, Cosmos DB (Gremlin API) |
 | **Time-series** | Timestamped points, often per metric/tag | Range queries over time, aggregations/rollups | Usually eventual, write-optimized | Time-partitioned, horizontal | InfluxDB, Prometheus, Azure Data Explorer |
 | **Search** | Inverted index over text and structured fields | Full-text search, fuzzy match, relevance ranking, faceting | Eventual (indexing lag) | Horizontal via shards | Elasticsearch, Azure AI Search |
-| **Blob / object store** | Opaque files, flat namespace | Fetch/store a whole file by key | Eventual (usually) | Effectively unlimited, horizontal | S3, Azure Blob Storage, GCS |
+| **Blob / object store** | Opaque files, flat namespace | Fetch/store a whole file by key | Strong object read-after-write in major providers; async replication/CDN can lag | Effectively unlimited, horizontal | S3, Azure Blob Storage, GCS |
 
 ```mermaid
 flowchart TD

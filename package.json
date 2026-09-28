@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "validate": "node tools/validate-content.mjs",
     "validate:fix": "node tools/validate-content.mjs --fix",
+    "audit": "node tools/audit-content.mjs",
+    "syllabus": "node tools/check-syllabus.mjs",
     "check:mermaid": "node tools/check-mermaid.mjs",
     "stats": "node tools/stats.mjs",
     "smoke": "node tools/smoke.mjs --sample",
@@ -19,7 +21,7 @@
     "smoke:hierarchy": "node tools/check-hierarchy.mjs",
     "regroup": "node tools/regroup.mjs",
     "renumber": "node tools/renumber.mjs",
-    "check": "npm run typecheck && npm run validate && npm run check:mermaid"
+    "check": "npm run typecheck && npm run validate && npm run check:mermaid && npm run audit && npm run syllabus"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.1.1",

@@ -70,7 +70,6 @@ classDiagram
     class ParkingSpot {
         -String id
         -SpotType type
-        -boolean reserved
     }
     class Ticket {
         -String id
@@ -172,41 +171,42 @@ public class HourlyPricingStrategy implements PricingStrategy {
 
 ```java
 public class ParkingLot {
-    private final ConcurrentMap<String, ParkingSpot> occupiedBySpotId = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, Ticket> activeTickets = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Ticket> activeTicketsBySpotId = new ConcurrentHashMap<>();
     private final List<ParkingSpot> allSpots;
     private final SpotAllocationStrategy allocation;
     private final PricingStrategy pricing;
 
     public Ticket enter(VehicleType type) {
         List<ParkingSpot> free = allSpots.stream()
-            .filter(s -> !occupiedBySpotId.containsKey(s.getId()))
+            .filter(s -> !activeTicketsBySpotId.containsKey(s.getId()))
             .collect(Collectors.toList());
         ParkingSpot spot = allocation.tryAllocate(free, type)
             .orElseThrow(() -> new IllegalStateException("Lot full for this vehicle type"));
 
-        // Atomic claim: fails if another thread grabbed it first.
-        if (occupiedBySpotId.putIfAbsent(spot.getId(), spot) != null)
+        Ticket ticket = new Ticket(UUID.randomUUID().toString(), spot.getId(), type, Instant.now());
+
+        // Atomic claim: the active ticket itself is the occupancy record for the spot.
+        if (activeTicketsBySpotId.putIfAbsent(spot.getId(), ticket) != null)
             return enter(type); // retry — spot lost the race
 
-        Ticket ticket = new Ticket(UUID.randomUUID().toString(), spot.getId(), type, Instant.now());
-        activeTickets.put(ticket.getId(), ticket);
         return ticket;
     }
 
     public BigDecimal exit(String ticketId) {
-        Ticket ticket = activeTickets.remove(ticketId);
-        if (ticket == null)
-            throw new IllegalStateException("Invalid or already-used ticket");
+        Map.Entry<String, Ticket> entry = activeTicketsBySpotId.entrySet().stream()
+            .filter(e -> e.getValue().getId().equals(ticketId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("Invalid or already-used ticket"));
 
+        Ticket ticket = entry.getValue();
         BigDecimal fee = pricing.calculateFee(ticket, Instant.now());
-        occupiedBySpotId.remove(ticket.getSpotId());
+        activeTicketsBySpotId.remove(ticket.getSpotId(), ticket);
         return fee;
     }
 }
 ```
 
-Worked example: a car enters at 10:00 and is assigned spot `B`, receiving ticket `T123`. It exits at 12:30 — 2.5 hours parked, rounded up to 3 billable hours; at 500 cents/hour that's a 1,500-cent fee, spot `B` is removed from `_occupiedBySpotId`, and `T123` is removed from `_activeTickets` so the same ticket can never be replayed for a second refund or a second exit.
+Worked example: a car enters at 10:00 and is assigned spot `B`, receiving ticket `T123`. It exits at 12:30 — 2.5 hours parked, rounded up to 3 billable hours; at 500 cents/hour that's a 1,500-cent fee, the ticket for spot `B` is removed from `activeTicketsBySpotId`, so the spot becomes free and the same ticket can never be replayed for a second refund or a second exit.
 
 ## Concurrency and thread safety
 
@@ -227,7 +227,7 @@ private Optional<ParkingSpot> findAvailableSpot(VehicleType type) {
     rwLock.readLock().lock();
     try {
         return allSpots.stream()
-            .filter(s -> s.getType() == type && !occupiedBySpotId.containsKey(s.getId()))
+            .filter(s -> s.getType() == type && !activeTicketsBySpotId.containsKey(s.getId()))
             .findFirst();
     } finally {
         rwLock.readLock().unlock();
@@ -240,8 +240,9 @@ public Ticket enter(VehicleType type) {
             .orElseThrow(() -> new IllegalStateException("No available spots"));
         rwLock.writeLock().lock();
         try {
-            if (occupiedBySpotId.putIfAbsent(spot.getId(), spot) == null)
-                return issueTicket(spot, type); // succeeded under the write lock
+            Ticket ticket = new Ticket(UUID.randomUUID().toString(), spot.getId(), type, Instant.now());
+            if (activeTicketsBySpotId.putIfAbsent(spot.getId(), ticket) == null)
+                return ticket; // succeeded under the write lock
         } finally {
             rwLock.writeLock().unlock();
         }
@@ -305,7 +306,7 @@ Two independent pieces of mutable state that must always agree are a bug waiting
 
 ### Q4. How would you support a motorcycle parking in a car spot when all motorcycle spots are full?
 
-Add an `OverflowAllocationStrategy` that wraps the default one: try the exact-match strategy first, and if it returns null, retry against the next-larger spot type. This is decorator-style composition over the existing `SpotAllocationStrategy` interface — `ParkingLot` calls the same method signature and never learns that overflow logic exists, which is the point of hiding policy behind an interface.
+Add an `OverflowAllocationStrategy` that wraps the default exact-match strategy. It first asks for a motorcycle spot; if none is free, it retries with the next compatible larger type, such as a car spot, and only then reports the lot full. Keep the compatibility ranking (`MOTORCYCLE -> COMPACT -> LARGE`, or whatever the business allows) inside the strategy, not inside `ParkingLot.enter`. That preserves Open/Closed: the lot still calls one `tryAllocate(vehicleType)` method, while the policy can later change to prefer overflow only on certain floors, reserve accessible spots, or charge a different price. Also make the choice explicit in reporting/display boards, because using a larger spot reduces capacity for cars and can surprise operations teams if it is hidden.
 
 ### Q5. How do you calculate the parking fee, and what edge cases matter?
 

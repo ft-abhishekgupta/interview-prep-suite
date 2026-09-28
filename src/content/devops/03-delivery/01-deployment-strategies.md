@@ -5,7 +5,7 @@ difficulty: Core
 tags: [deployment, release-engineering, kubernetes, databases]
 ---
 
-"Deployment" and "release" are not the same thing, and the strategy you pick determines how much blast radius a bad change gets before anyone notices. This page compares the standard deployment strategies on the axes interviewers actually probe — downtime, rollback speed, cost, risk — then goes deep on the two questions that separate a mid-level answer from a senior one: how you migrate a database safely mid-rollout, and how feature flags let you deploy without releasing.
+"Deployment" and "release" are not the same thing, and the strategy you pick determines how much blast radius a bad change gets before anyone notices. The useful comparison is across the axes interviewers actually probe — downtime, rollback speed, cost, risk — plus the two questions that separate a mid-level answer from a senior one: how to migrate a database safely mid-rollout, and how feature flags let you deploy without releasing.
 
 ## Comparing the strategies
 
